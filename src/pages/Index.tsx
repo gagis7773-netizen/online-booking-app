@@ -1063,30 +1063,49 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "settings";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
 const GRAD = { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" };
 
+const ADMIN_SESSION_KEY = "gp_admin_session";
+
+function saveAdminSession(s: any) { localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(s)); }
+function loadAdminSession(): any | null {
+  try { return JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || "null"); } catch { return null; }
+}
+function clearAdminSession() { localStorage.removeItem(ADMIN_SESSION_KEY); }
+
 function AdminPage({ onBack }: { onBack: () => void }) {
+  const [adminUser, setAdminUser] = useState<any>(loadAdminSession());
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    adminPost("stats").then(d => setStats(d)).catch(() => {});
-  }, []);
+    if (adminUser) adminPost("stats").then(d => setStats(d)).catch(() => {});
+  }, [adminUser]);
 
-  const menuItems: { id: AdminSection; icon: string; label: string; color: string }[] = [
-    { id: "dashboard", icon: "LayoutDashboard", label: "Сводка", color: "from-pink-500 to-rose-500" },
-    { id: "clients", icon: "Users", label: "Клиенты", color: "from-purple-500 to-pink-500" },
+  const handleLogin = (user: any) => { saveAdminSession(user); setAdminUser(user); };
+  const handleLogout = () => { clearAdminSession(); setAdminUser(null); setSection("dashboard"); };
+
+  if (!adminUser) return <AdminPinScreen onSuccess={handleLogin} onBack={onBack} />;
+
+  const isOwner = adminUser.role === "owner";
+
+  const menuItems: { id: AdminSection; icon: string; label: string; color: string; ownerOnly?: boolean }[] = [
     { id: "schedule", icon: "CalendarDays", label: "Расписание", color: "from-blue-500 to-indigo-500" },
+    { id: "clients", icon: "Users", label: "Клиенты", color: "from-purple-500 to-pink-500" },
     { id: "messages", icon: "MessageCircle", label: "Сообщения", color: "from-teal-500 to-cyan-500" },
-    { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500" },
-    { id: "expenses", icon: "Wallet", label: "Расходы", color: "from-red-500 to-orange-500" },
+    { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500", ownerOnly: true },
+    { id: "expenses", icon: "Wallet", label: "Расходы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
-    { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500" },
+    { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
+    { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
   ];
+
+  const visibleMenu = isOwner ? menuItems : menuItems.filter(m => !m.ownerOnly);
+  const currentLabel = section === "dashboard" ? "Панель управления" : menuItems.find(m => m.id === section)?.label;
 
   return (
     <div className="animate-fade-in">
@@ -1096,42 +1115,86 @@ function AdminPage({ onBack }: { onBack: () => void }) {
           style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
           <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
         </button>
-        <div>
-          <h1 className="text-xl font-oswald font-bold" style={P}>
-            {section === "dashboard" ? "Панель управления" : menuItems.find(m => m.id === section)?.label}
-          </h1>
-          <p className="text-xs" style={PS}>Только для владельца</p>
+        <div className="flex-1">
+          <h1 className="text-xl font-oswald font-bold" style={P}>{currentLabel}</h1>
+          <p className="text-xs" style={PS}>{adminUser.name} · {adminUser.role === "owner" ? "Владелец 👑" : "Специалист"}</p>
         </div>
-        <div className="ml-auto text-2xl">👑</div>
+        <button onClick={handleLogout} className="px-3 py-1.5 rounded-xl text-xs font-medium"
+          style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+          Выйти
+        </button>
       </div>
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
-          {/* Статистика */}
-          {stats && (
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              {[
-                { label: "Клиентов", val: stats.clients_total, icon: "Users", color: "from-pink-500 to-rose-500" },
-                { label: "Записей всего", val: stats.bookings_total, icon: "CalendarCheck", color: "from-purple-500 to-pink-500" },
-                { label: "За месяц", val: stats.bookings_month, icon: "TrendingUp", color: "from-blue-500 to-indigo-500" },
-                { label: "Расходы/мес", val: `${stats.expenses_month} ₽`, icon: "Wallet", color: "from-orange-500 to-red-500" },
-              ].map(item => (
-                <div key={item.label} className="card-glow rounded-2xl p-4">
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
-                    <Icon name={item.icon as any} size={16} className="text-white" />
+          {isOwner && stats && (
+            <>
+              {/* Блок финансов */}
+              <h2 className="text-sm font-oswald font-semibold mb-2 uppercase tracking-wider" style={PS}>Финансы</h2>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[
+                  { label: "Расходы/нед", val: `${(stats.expenses_week||0).toLocaleString()} ₽`, icon: "TrendingDown", color: "from-red-400 to-orange-400" },
+                  { label: "Расходы/мес", val: `${(stats.expenses_month||0).toLocaleString()} ₽`, icon: "Wallet", color: "from-orange-400 to-amber-400" },
+                  { label: "Расходы итог", val: `${(stats.expenses_total||0).toLocaleString()} ₽`, icon: "PiggyBank", color: "from-pink-400 to-rose-400" },
+                ].map(item => (
+                  <div key={item.label} className="card-glow rounded-2xl p-3">
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                      <Icon name={item.icon as any} size={14} className="text-white" />
+                    </div>
+                    <div className="text-base font-oswald font-bold leading-tight" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+                    <div className="text-[10px] leading-tight mt-0.5" style={PS}>{item.label}</div>
                   </div>
-                  <div className="text-2xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
-                  <div className="text-xs" style={PS}>{item.label}</div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {/* Блок клиентов */}
+              <h2 className="text-sm font-oswald font-semibold mb-2 uppercase tracking-wider" style={PS}>Клиенты</h2>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {[
+                  { label: "Всего клиентов", val: stats.clients_total, icon: "Users", color: "from-purple-500 to-pink-500" },
+                  { label: "Новых за месяц", val: `+${stats.clients_month}`, icon: "UserPlus", color: "from-fuchsia-500 to-purple-500" },
+                ].map(item => (
+                  <div key={item.label} className="card-glow rounded-2xl p-4">
+                    <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                      <Icon name={item.icon as any} size={16} className="text-white" />
+                    </div>
+                    <div className="text-2xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+                    <div className="text-xs" style={PS}>{item.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Блок записей */}
+              <h2 className="text-sm font-oswald font-semibold mb-2 uppercase tracking-wider" style={PS}>Записи</h2>
+              <div className="grid grid-cols-3 gap-2 mb-5">
+                {[
+                  { label: "Всего записей", val: stats.bookings_total, icon: "CalendarCheck", color: "from-blue-500 to-indigo-500" },
+                  { label: "За месяц", val: stats.bookings_month, icon: "TrendingUp", color: "from-cyan-500 to-blue-500" },
+                  { label: "В расписании", val: stats.schedule_total, icon: "Clock", color: "from-teal-500 to-cyan-500" },
+                ].map(item => (
+                  <div key={item.label} className="card-glow rounded-2xl p-3">
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                      <Icon name={item.icon as any} size={14} className="text-white" />
+                    </div>
+                    <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+                    <div className="text-[10px] leading-tight" style={PS}>{item.label}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {!isOwner && (
+            <div className="card-glow rounded-2xl p-5 mb-5 text-center">
+              <div className="text-3xl mb-2">🌸</div>
+              <p className="font-semibold text-sm" style={P}>Добро пожаловать, {adminUser.name}!</p>
+              <p className="text-xs mt-1" style={PS}>Используй меню ниже для работы с записями</p>
             </div>
           )}
-          {!stats && <div className="text-center py-6"><div className="text-3xl animate-float">🌸</div></div>}
+          {!stats && isOwner && <div className="text-center py-6"><div className="text-3xl animate-float">🌸</div></div>}
 
-          {/* Меню разделов */}
           <h2 className="text-base font-oswald font-semibold mb-3" style={P}>Разделы</h2>
           <div className="grid grid-cols-2 gap-3">
-            {menuItems.slice(1).map(item => (
+            {visibleMenu.map(item => (
               <button key={item.id} onClick={() => setSection(item.id)}
                 className="card-glow rounded-2xl p-4 text-left hover:scale-105 transition-all">
                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3`}>
@@ -1147,10 +1210,93 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "clients" && <AdminClients />}
       {section === "schedule" && <AdminSchedule />}
       {section === "messages" && <AdminMessages />}
-      {section === "notifications" && <AdminNotifications />}
-      {section === "expenses" && <AdminExpenses />}
+      {section === "notifications" && isOwner && <AdminNotifications />}
+      {section === "expenses" && isOwner && <AdminExpenses />}
       {section === "gallery" && <AdminGallery />}
-      {section === "settings" && <AdminSettings />}
+      {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
+      {section === "settings" && isOwner && <AdminSettings />}
+    </div>
+  );
+}
+
+// ── ПИН-ЭКРАН ──
+function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void; onBack: () => void }) {
+  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [attempts, setAttempts] = useState(0);
+
+  const handleDigit = (d: string) => {
+    if (pin.length >= 4) return;
+    const next = pin + d;
+    setPin(next);
+    setError("");
+    if (next.length === 4) setTimeout(() => checkPin(next), 150);
+  };
+
+  const checkPin = async (p: string) => {
+    setLoading(true);
+    try {
+      const data = await adminPost("auth", { pin: p });
+      if (data.ok) {
+        onSuccess(data.staff);
+      } else {
+        setAttempts(a => a + 1);
+        setError("Неверный пин-код");
+        setPin("");
+      }
+    } catch {
+      setError("Ошибка соединения");
+      setPin("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const digits = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-fade-in">
+      <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg mb-6"
+        style={{ background: "rgba(255,255,255,0.95)" }}>
+        <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
+      </div>
+      <h1 className="text-2xl font-oswald font-bold mb-1" style={P}>Панель управления</h1>
+      <p className="text-sm mb-8" style={PS}>Введи пин-код для входа</p>
+
+      {/* Точки пина */}
+      <div className="flex gap-4 mb-8">
+        {[0,1,2,3].map(i => (
+          <div key={i} className="w-4 h-4 rounded-full border-2 transition-all duration-200"
+            style={pin.length > i
+              ? { background: "hsl(335 80% 58%)", borderColor: "hsl(335 80% 58%)" }
+              : { borderColor: "hsl(335 50% 80%)", background: "transparent" }} />
+        ))}
+      </div>
+
+      {error && (
+        <div className="mb-4 px-4 py-2 rounded-xl text-sm font-medium"
+          style={{ background: "hsl(0 80% 96%)", color: "hsl(0 70% 45%)", border: "1px solid hsl(0 60% 88%)" }}>
+          {error} {attempts >= 3 && "· Подсказка: 2025"}
+        </div>
+      )}
+
+      {/* Цифровая клавиатура */}
+      <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+        {digits.map((d, i) => (
+          <button key={i}
+            onClick={() => { if (d === "⌫") { setPin(p => p.slice(0,-1)); setError(""); } else if (d) handleDigit(d); }}
+            disabled={loading || !d}
+            className="h-16 rounded-2xl font-oswald font-bold text-2xl transition-all active:scale-95"
+            style={d
+              ? { background: "white", color: "hsl(335 60% 30%)", boxShadow: "0 2px 8px hsl(335 30% 85%)", border: "1px solid hsl(335 30% 92%)" }
+              : { background: "transparent" }}>
+            {d}
+          </button>
+        ))}
+      </div>
+
+      <button onClick={onBack} className="mt-8 text-sm" style={PS}>← Вернуться на главную</button>
     </div>
   );
 }
@@ -1572,6 +1718,129 @@ function AdminGallery() {
           </div>
         ))}
         {!loading && items.length === 0 && <div className="col-span-2 text-center py-8 text-sm" style={PS}>Галерея пуста</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Сотрудники ──
+function AdminStaff({ currentStaffId }: { currentStaffId: number }) {
+  const [staff, setStaff] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", role: "specialist", pin: "" });
+  const [saving, setSaving] = useState(false);
+  const [editPin, setEditPin] = useState<number | null>(null);
+  const [newPin, setNewPin] = useState("");
+
+  const load = () => adminPost("staff").then(d => { setStaff(d.staff || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const add = async () => {
+    if (!form.name || !form.pin || form.pin.length < 4) return;
+    setSaving(true);
+    await adminPost("staff", { action: "add", ...form });
+    setForm({ name: "", phone: "", role: "specialist", pin: "" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const remove = async (id: number) => {
+    if (!confirm("Удалить сотрудника?")) return;
+    await adminPost("staff", { action: "delete", id }); load();
+  };
+
+  const resetPin = async (id: number) => {
+    if (newPin.length < 4) return;
+    await adminPost("staff", { action: "reset_pin", id, pin: newPin });
+    setEditPin(null); setNewPin(""); load();
+  };
+
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="card-glow rounded-2xl p-4 mb-4 text-sm" style={{ ...PS, fontSize: 12, background: "hsl(335 80% 97%)", border: "1px solid hsl(335 60% 88%)" }}>
+        💡 Специалист входит в панель со своим пин-кодом. Он видит расписание, клиентов, галерею и сообщения — но не видит финансы и настройки.
+      </div>
+
+      <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {adding ? "✕ Отмена" : "+ Добавить сотрудника"}
+      </button>
+
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          {[
+            { key: "name", label: "Имя", ph: "Имя сотрудника" },
+            { key: "phone", label: "Телефон", ph: "+7..." },
+            { key: "pin", label: "Пин-код (4 цифры)", ph: "1234" },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+              <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.ph} maxLength={f.key === "pin" ? 4 : 100} type={f.key === "pin" ? "number" : "text"}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            </div>
+          ))}
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Роль</label>
+            <div className="flex gap-2">
+              {[{ val: "specialist", label: "Специалист" }, { val: "admin", label: "Администратор" }].map(r => (
+                <button key={r.val} onClick={() => setForm(p => ({ ...p, role: r.val }))}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+                  style={form.role === r.val ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={add} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "Добавить"}
+          </button>
+        </div>
+      )}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-3">
+        {staff.map(s => (
+          <div key={s.id} className="card-glow rounded-2xl p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={GRAD}>
+                {s.name?.[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm" style={P}>{s.name}</div>
+                <div className="text-xs" style={PS}>{s.role === "owner" ? "👑 Владелец" : s.role === "admin" ? "🛡 Администратор" : "💅 Специалист"} · {s.phone}</div>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full"
+                style={s.is_active ? { background: "hsl(142 60% 92%)", color: "hsl(142 60% 35%)" } : { background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>
+                {s.is_active ? "Активен" : "Отключён"}
+              </span>
+            </div>
+            {s.role !== "owner" && s.id !== currentStaffId && (
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => { setEditPin(editPin === s.id ? null : s.id); setNewPin(""); }}
+                  className="flex-1 py-2 rounded-xl text-xs font-medium"
+                  style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+                  Сменить пин
+                </button>
+                <button onClick={() => remove(s.id)}
+                  className="py-2 px-3 rounded-xl text-xs font-medium"
+                  style={{ background: "hsl(0 60% 96%)", color: "hsl(0 60% 50%)" }}>
+                  Удалить
+                </button>
+              </div>
+            )}
+            {editPin === s.id && (
+              <div className="mt-2 flex gap-2">
+                <input value={newPin} onChange={e => setNewPin(e.target.value)} placeholder="Новый пин" maxLength={4}
+                  className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} />
+                <button onClick={() => resetPin(s.id)} className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={GRAD}>
+                  ОК
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

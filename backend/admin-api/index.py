@@ -1,14 +1,11 @@
 """
-Админ API для Girly Paradise — панель владельца.
-Разделы: stats, schedule, expenses, notifications, gallery, clients
+Админ API для Girly Paradise — панель владельца. v2
+Авторизация по PIN, разделы: stats, schedule, expenses, notifications, gallery, clients, staff
 """
 import json
 import os
 import psycopg2
 import psycopg2.extras
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import urllib.request
 import urllib.parse
 
@@ -39,7 +36,7 @@ def send_sms(phone, message):
         "json": 1,
     })
     try:
-        req = urllib.request.urlopen(f"https://sms.ru/sms/send?{params}", timeout=10)
+        urllib.request.urlopen(f"https://sms.ru/sms/send?{params}", timeout=10)
         return True
     except:
         return False
@@ -48,233 +45,200 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
-    method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
     body = json.loads(event.get("body") or "{}")
-
-    section = body.get("section") or (path.split("/")[-1] if "/" in path else "stats")
+    section = body.get("section", "stats")
 
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+    # ── АВТОРИЗАЦИЯ ──
+    if section == "auth":
+        pin = str(body.get("pin", "")).strip()
+        cur.execute(f"SELECT id, name, role, pin FROM {SCHEMA}.staff WHERE pin = %s AND is_active = true", (pin,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return resp({"ok": False, "error": "Неверный пин-код"}, 401)
+        return resp({"ok": True, "staff": {"id": row["id"], "name": row["name"], "role": row["role"]}})
+
     # ── СТАТИСТИКА ──
-    if section == "stats" or (method == "GET" and "stats" in path):
-        cur.execute(f"SELECT COUNT(*) as total FROM {SCHEMA}.clients")
-        clients_total = cur.fetchone()["total"]
+    if section == "stats":
+        cur.execute(f"SELECT COUNT(*) as v FROM {SCHEMA}.clients")
+        clients_total = cur.fetchone()["v"]
 
-        cur.execute(f"SELECT COUNT(*) as total FROM {SCHEMA}.bookings")
-        bookings_total = cur.fetchone()["total"]
+        cur.execute(f"SELECT COUNT(*) as v FROM {SCHEMA}.bookings")
+        bookings_total = cur.fetchone()["v"]
 
-        cur.execute(f"SELECT COUNT(*) as total FROM {SCHEMA}.bookings WHERE created_at >= NOW() - INTERVAL '30 days'")
-        bookings_month = cur.fetchone()["total"]
+        cur.execute(f"SELECT COUNT(*) as v FROM {SCHEMA}.bookings WHERE created_at >= NOW() - INTERVAL '30 days'")
+        bookings_month = cur.fetchone()["v"]
 
-        cur.execute(f"SELECT COUNT(*) as total FROM {SCHEMA}.schedule WHERE status = 'confirmed' AND booking_date >= TO_CHAR(NOW(), 'YYYY-MM-DD')")
-        upcoming = cur.fetchone()["total"]
+        cur.execute(f"SELECT COUNT(*) as v FROM {SCHEMA}.clients WHERE created_at >= NOW() - INTERVAL '30 days'")
+        clients_month = cur.fetchone()["v"]
 
-        cur.execute(f"SELECT COALESCE(SUM(amount), 0) as total FROM {SCHEMA}.expenses WHERE expense_date >= DATE_TRUNC('month', NOW())")
-        expenses_month = float(cur.fetchone()["total"])
+        cur.execute(f"SELECT COUNT(*) as v FROM {SCHEMA}.schedule WHERE status = 'confirmed'")
+        schedule_total = cur.fetchone()["v"]
+
+        cur.execute(f"SELECT COALESCE(SUM(amount), 0) as v FROM {SCHEMA}.expenses")
+        expenses_total = float(cur.fetchone()["v"])
+
+        cur.execute(f"SELECT COALESCE(SUM(amount), 0) as v FROM {SCHEMA}.expenses WHERE expense_date >= DATE_TRUNC('month', NOW())")
+        expenses_month = float(cur.fetchone()["v"])
+
+        cur.execute(f"SELECT COALESCE(SUM(amount), 0) as v FROM {SCHEMA}.expenses WHERE expense_date >= DATE_TRUNC('week', NOW())")
+        expenses_week = float(cur.fetchone()["v"])
+
+        cur.execute(f"""
+            SELECT TO_CHAR(created_at, 'Mon') as mon, COUNT(*) as cnt
+            FROM {SCHEMA}.bookings
+            WHERE created_at >= NOW() - INTERVAL '6 months'
+            GROUP BY TO_CHAR(created_at, 'Mon'), DATE_TRUNC('month', created_at)
+            ORDER BY DATE_TRUNC('month', created_at)
+        """)
+        bookings_chart = [dict(r) for r in cur.fetchall()]
+
+        cur.execute(f"""
+            SELECT TO_CHAR(created_at, 'Mon') as mon, COUNT(*) as cnt
+            FROM {SCHEMA}.clients
+            WHERE created_at >= NOW() - INTERVAL '6 months'
+            GROUP BY TO_CHAR(created_at, 'Mon'), DATE_TRUNC('month', created_at)
+            ORDER BY DATE_TRUNC('month', created_at)
+        """)
+        clients_chart = [dict(r) for r in cur.fetchall()]
 
         conn.close()
         return resp({
             "clients_total": clients_total,
+            "clients_month": clients_month,
             "bookings_total": bookings_total,
             "bookings_month": bookings_month,
-            "upcoming": upcoming,
+            "schedule_total": schedule_total,
+            "expenses_total": expenses_total,
             "expenses_month": expenses_month,
+            "expenses_week": expenses_week,
+            "bookings_chart": bookings_chart,
+            "clients_chart": clients_chart,
         })
 
     # ── РАСПИСАНИЕ ──
     if section == "schedule":
-        if method == "GET":
+        if body.get("action") == "add":
             cur.execute(f"""
-                SELECT * FROM {SCHEMA}.schedule
-                ORDER BY booking_date DESC, booking_time ASC
-                LIMIT 50
-            """)
-            rows = [dict(r) for r in cur.fetchall()]
-            conn.close()
-            return resp({"schedule": rows})
-
-        if method == "POST":
-            action = body.get("action", "add")
-            if action == "add":
-                cur.execute(f"""
-                    INSERT INTO {SCHEMA}.schedule
-                    (client_name, client_phone, services, master, booking_date, booking_time, status, notes)
-                    VALUES (%(cn)s, %(cp)s, %(sv)s, %(m)s, %(d)s, %(t)s, %(st)s, %(n)s)
-                    RETURNING id
-                """, {
-                    "cn": body.get("client_name", ""),
-                    "cp": body.get("client_phone", ""),
-                    "sv": body.get("services", ""),
-                    "m": body.get("master", "Галина"),
-                    "d": body.get("booking_date", ""),
-                    "t": body.get("booking_time", ""),
-                    "st": body.get("status", "confirmed"),
-                    "n": body.get("notes", ""),
-                })
-                row_id = cur.fetchone()["id"]
-                conn.commit()
-                conn.close()
-                return resp({"ok": True, "id": row_id})
-
-            if action == "delete":
-                cur.execute(f"DELETE FROM {SCHEMA}.schedule WHERE id = %(id)s", {"id": body.get("id")})
-                conn.commit()
-                conn.close()
-                return resp({"ok": True})
-
-            if action == "update_status":
-                cur.execute(f"UPDATE {SCHEMA}.schedule SET status = %(s)s WHERE id = %(id)s",
-                            {"s": body.get("status"), "id": body.get("id")})
-                conn.commit()
-                conn.close()
-                return resp({"ok": True})
+                INSERT INTO {SCHEMA}.schedule
+                (client_name, client_phone, services, master, booking_date, booking_time, status, notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            """, (body.get("client_name",""), body.get("client_phone",""), body.get("services",""),
+                  body.get("master","Галина"), body.get("booking_date",""), body.get("booking_time",""),
+                  body.get("status","confirmed"), body.get("notes","")))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close()
+            return resp({"ok": True, "id": row_id})
+        if body.get("action") == "delete":
+            cur.execute(f"DELETE FROM {SCHEMA}.schedule WHERE id = %s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "update_status":
+            cur.execute(f"UPDATE {SCHEMA}.schedule SET status = %s WHERE id = %s", (body.get("status"), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.schedule ORDER BY booking_date DESC, booking_time ASC LIMIT 100")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"schedule": rows})
 
     # ── РАСХОДЫ ──
     if section == "expenses":
-        if method == "GET":
-            cur.execute(f"SELECT * FROM {SCHEMA}.expenses ORDER BY expense_date DESC, created_at DESC LIMIT 100")
-            rows = [dict(r) for r in cur.fetchall()]
-            cur.execute(f"SELECT COALESCE(SUM(amount),0) as total FROM {SCHEMA}.expenses")
-            total = float(cur.fetchone()["total"])
-            cur.execute(f"SELECT COALESCE(SUM(amount),0) as total FROM {SCHEMA}.expenses WHERE expense_date >= DATE_TRUNC('month', NOW())")
-            month = float(cur.fetchone()["total"])
-            conn.close()
-            return resp({"expenses": rows, "total": total, "month": month})
-
-        if method == "POST":
-            action = body.get("action", "add")
-            if action == "add":
-                cur.execute(f"""
-                    INSERT INTO {SCHEMA}.expenses (title, amount, category, expense_date, notes)
-                    VALUES (%(t)s, %(a)s, %(c)s, %(d)s, %(n)s) RETURNING id
-                """, {
-                    "t": body.get("title", ""),
-                    "a": float(body.get("amount", 0)),
-                    "c": body.get("category", "Прочее"),
-                    "d": body.get("expense_date", ""),
-                    "n": body.get("notes", ""),
-                })
-                row_id = cur.fetchone()["id"]
-                conn.commit()
-                conn.close()
-                return resp({"ok": True, "id": row_id})
-
-            if action == "delete":
-                cur.execute(f"DELETE FROM {SCHEMA}.expenses WHERE id = %(id)s", {"id": body.get("id")})
-                conn.commit()
-                conn.close()
-                return resp({"ok": True})
+        if body.get("action") == "add":
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.expenses (title, amount, category, expense_date, notes)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id
+            """, (body.get("title",""), float(body.get("amount",0)), body.get("category","Прочее"),
+                  body.get("expense_date",""), body.get("notes","")))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "delete":
+            cur.execute(f"DELETE FROM {SCHEMA}.expenses WHERE id = %s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.expenses ORDER BY expense_date DESC, created_at DESC LIMIT 100")
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.execute(f"SELECT COALESCE(SUM(amount),0) as v FROM {SCHEMA}.expenses"); total = float(cur.fetchone()["v"])
+        cur.execute(f"SELECT COALESCE(SUM(amount),0) as v FROM {SCHEMA}.expenses WHERE expense_date >= DATE_TRUNC('month', NOW())"); month = float(cur.fetchone()["v"])
+        conn.close(); return resp({"expenses": rows, "total": total, "month": month})
 
     # ── УВЕДОМЛЕНИЯ / SMS ──
     if section == "notifications":
-        if method == "GET":
-            cur.execute(f"SELECT n.*, c.name as client_name FROM {SCHEMA}.notifications n LEFT JOIN {SCHEMA}.clients c ON c.id = n.client_id ORDER BY n.created_at DESC LIMIT 50")
-            rows = [dict(r) for r in cur.fetchall()]
-            conn.close()
-            return resp({"notifications": rows})
-
-        if method == "POST":
-            action = body.get("action", "send")
-            if action == "send":
-                phone = body.get("phone", "")
-                message = body.get("message", "")
-                client_id = body.get("client_id")
-                ok = send_sms(phone, message)
-                cur.execute(f"""
-                    INSERT INTO {SCHEMA}.notifications (client_id, client_phone, message, status, sent_at)
-                    VALUES (%(cid)s, %(p)s, %(m)s, %(s)s, NOW())
-                """, {
-                    "cid": client_id,
-                    "p": phone,
-                    "m": message,
-                    "s": "sent" if ok else "failed",
-                })
-                conn.commit()
-                conn.close()
-                return resp({"ok": True, "sms_sent": ok})
-
-            if action == "send_all":
-                message = body.get("message", "")
-                cur.execute(f"SELECT id, phone FROM {SCHEMA}.clients")
-                clients = cur.fetchall()
-                count = 0
-                for c in clients:
-                    ok = send_sms(c["phone"], message)
-                    cur.execute(f"""
-                        INSERT INTO {SCHEMA}.notifications (client_id, client_phone, message, status, sent_at)
-                        VALUES (%(cid)s, %(p)s, %(m)s, %(s)s, NOW())
-                    """, {
-                        "cid": c["id"],
-                        "p": c["phone"],
-                        "m": message,
-                        "s": "sent" if ok else "failed",
-                    })
-                    if ok:
-                        count += 1
-                conn.commit()
-                conn.close()
-                return resp({"ok": True, "sent": count})
+        if body.get("action") == "send":
+            phone = body.get("phone",""); message = body.get("message","")
+            ok = send_sms(phone, message)
+            cur.execute(f"INSERT INTO {SCHEMA}.notifications (client_id, client_phone, message, status, sent_at) VALUES (%s,%s,%s,%s,NOW())",
+                        (body.get("client_id"), phone, message, "sent" if ok else "failed"))
+            conn.commit(); conn.close(); return resp({"ok": True, "sms_sent": ok})
+        if body.get("action") == "send_all":
+            message = body.get("message","")
+            cur.execute(f"SELECT id, phone FROM {SCHEMA}.clients")
+            clients = cur.fetchall()
+            count = 0
+            for c in clients:
+                ok = send_sms(c["phone"], message)
+                cur.execute(f"INSERT INTO {SCHEMA}.notifications (client_id, client_phone, message, status, sent_at) VALUES (%s,%s,%s,%s,NOW())",
+                            (c["id"], c["phone"], message, "sent" if ok else "failed"))
+                if ok: count += 1
+            conn.commit(); conn.close(); return resp({"ok": True, "sent": count})
+        cur.execute(f"SELECT n.*, c.name as client_name FROM {SCHEMA}.notifications n LEFT JOIN {SCHEMA}.clients c ON c.id = n.client_id ORDER BY n.created_at DESC LIMIT 50")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"notifications": rows})
 
     # ── ГАЛЕРЕЯ ──
     if section == "gallery":
-        if method == "GET":
-            cur.execute(f"SELECT * FROM {SCHEMA}.admin_gallery ORDER BY created_at DESC")
-            rows = [dict(r) for r in cur.fetchall()]
-            conn.close()
-            return resp({"gallery": rows})
-
-        if method == "POST":
-            action = body.get("action", "add")
-            if action == "add":
-                cur.execute(f"""
-                    INSERT INTO {SCHEMA}.admin_gallery (title, url, category)
-                    VALUES (%(t)s, %(u)s, %(c)s) RETURNING id
-                """, {
-                    "t": body.get("title", ""),
-                    "u": body.get("url", ""),
-                    "c": body.get("category", "До и после"),
-                })
-                row_id = cur.fetchone()["id"]
-                conn.commit()
-                conn.close()
-                return resp({"ok": True, "id": row_id})
-
-            if action == "delete":
-                cur.execute(f"DELETE FROM {SCHEMA}.admin_gallery WHERE id = %(id)s", {"id": body.get("id")})
-                conn.commit()
-                conn.close()
-                return resp({"ok": True})
+        if body.get("action") == "add":
+            cur.execute(f"INSERT INTO {SCHEMA}.admin_gallery (title, url, category) VALUES (%s,%s,%s) RETURNING id",
+                        (body.get("title",""), body.get("url",""), body.get("category","До и после")))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "delete":
+            cur.execute(f"DELETE FROM {SCHEMA}.admin_gallery WHERE id = %s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.admin_gallery ORDER BY created_at DESC")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"gallery": rows})
 
     # ── КЛИЕНТЫ ──
     if section == "clients":
         cur.execute(f"""
             SELECT c.id, c.name, c.phone, c.created_at,
-                   COUNT(b.id) AS bookings_count,
-                   MAX(b.created_at) AS last_booking
+                   COUNT(b.id) AS bookings_count, MAX(b.created_at) AS last_booking
             FROM {SCHEMA}.clients c
             LEFT JOIN {SCHEMA}.bookings b ON b.client_id = c.id
             GROUP BY c.id ORDER BY c.created_at DESC
         """)
         rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
-        return resp({"clients": rows, "total": len(rows)})
+        conn.close(); return resp({"clients": rows, "total": len(rows)})
 
-    # ── СООБЩЕНИЯ (чаты) ──
+    # ── СОТРУДНИКИ ──
+    if section == "staff":
+        if body.get("action") == "add":
+            cur.execute(f"INSERT INTO {SCHEMA}.staff (name, phone, role, pin) VALUES (%s,%s,%s,%s) RETURNING id",
+                        (body.get("name",""), body.get("phone",""), body.get("role","specialist"), str(body.get("pin",""))))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "delete":
+            cur.execute(f"UPDATE {SCHEMA}.staff SET is_active = false WHERE id = %s AND role != 'owner'", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "reset_pin":
+            new_pin = str(body.get("pin",""))
+            cur.execute(f"UPDATE {SCHEMA}.staff SET pin = %s WHERE id = %s", (new_pin, body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT id, name, phone, role, is_active, created_at FROM {SCHEMA}.staff ORDER BY id")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"staff": rows})
+
+    # ── СООБЩЕНИЯ ──
     if section == "messages":
         cur.execute(f"""
             SELECT ch.id, ch.client_name, ch.client_phone, ch.created_at,
-                   COUNT(cm.id) as msg_count,
-                   MAX(cm.created_at) as last_msg
+                   COUNT(cm.id) as msg_count, MAX(cm.created_at) as last_msg
             FROM {SCHEMA}.chats ch
             LEFT JOIN {SCHEMA}.chat_messages cm ON cm.chat_id = ch.id
-            GROUP BY ch.id ORDER BY last_msg DESC NULLS LAST
-            LIMIT 50
+            GROUP BY ch.id ORDER BY last_msg DESC NULLS LAST LIMIT 50
         """)
         rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
-        return resp({"chats": rows})
+        conn.close(); return resp({"chats": rows})
 
     conn.close()
     return resp({"error": "Unknown section"}, 400)

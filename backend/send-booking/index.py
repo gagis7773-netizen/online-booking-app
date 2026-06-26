@@ -2,12 +2,14 @@ import json
 import os
 import smtplib
 import psycopg2
-# v4
+import urllib.request
+import urllib.parse
+# v5
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 SCHEMA = "t_p3248579_online_booking_app"
-
+OWNER_PHONE = "79046015556"
 
 def send_email(server, smtp_user, to_email, subject, html_body):
     msg = MIMEMultipart("alternative")
@@ -16,6 +18,21 @@ def send_email(server, smtp_user, to_email, subject, html_body):
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html", "utf-8"))
     server.sendmail(smtp_user, to_email, msg.as_string())
+
+def send_sms_owner(message):
+    api_id = os.environ.get("SMSRU_API_ID", "")
+    if not api_id:
+        return
+    params = urllib.parse.urlencode({
+        "api_id": api_id,
+        "to": OWNER_PHONE,
+        "msg": message,
+        "json": 1,
+    })
+    try:
+        urllib.request.urlopen(f"https://sms.ru/sms/send?{params}", timeout=8)
+    except:
+        pass
 
 
 def handler(event: dict, context) -> dict:
@@ -122,6 +139,10 @@ def handler(event: dict, context) -> dict:
         conn.close()
     except Exception:
         pass
+
+    # SMS владельцу
+    sms_text = f"Girly Paradise: новая запись! {name} ({phone}). Услуга: {service}. {day} в {time}. Мастер: {master}."
+    send_sms_owner(sms_text)
 
     with smtplib.SMTP_SSL("smtp.mail.ru", 465) as server:
         server.login(smtp_user, smtp_password)
