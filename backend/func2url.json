@@ -1,4 +1,6 @@
 {
+  "clients": "https://functions.poehali.dev/8e7601f2-57a9-4e42-982f-91f900c6831c",
+  "auth": "https://functions.poehali.dev/888bfad7-6580-4f39-b963-78aca5d4d8c0",
   "content": "https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941",
   "chat-sms": "https://functions.poehali.dev/cadfcb18-918a-427c-a334-5c8c8ace2c06",
   "send-booking": "https://functions.poehali.dev/33731d63-c7a5-4a89-b075-6b0a4282ecfc"

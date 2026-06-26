@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "Регистрация клиента",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "register", "phone": "+79001234567", "name": "Тест Клиент"},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Вход по телефону",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "phone": "+79001234567"},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

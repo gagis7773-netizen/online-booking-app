@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Список клиентов",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"total": 1},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
