@@ -15,18 +15,42 @@ CORS = {
 }
 
 SERVICES = [
-    {"name": "Криолиполиз", "category": "Тело", "price": "от 3 500 ₽", "duration": "60 мин"},
-    {"name": "Вакуумный массаж", "category": "Тело", "price": "от 2 000 ₽", "duration": "60 мин"},
-    {"name": "СМАС-лифтинг", "category": "Лицо", "price": "от 8 000 ₽", "duration": "90 мин"},
+    # Криолиполиз
+    {"name": "Криолиполиз 1–2 насадки", "category": "Криолиполиз", "price": "2 500 ₽", "duration": "60 мин"},
+    {"name": "Криолиполиз 3–4 насадки", "category": "Криолиполиз", "price": "4 500 ₽", "duration": "90 мин"},
+    {"name": "Криолиполиз 5–6 насадок", "category": "Криолиполиз", "price": "6 500 ₽", "duration": "120 мин"},
+    {"name": "Криолиполиз 7–8 насадок", "category": "Криолиполиз", "price": "8 500 ₽", "duration": "150 мин"},
+    {"name": "Криолиполиз подбородок (1 насадка)", "category": "Криолиполиз", "price": "2 000 ₽", "duration": "45 мин"},
+    # СМАС-лифтинг
+    {"name": "СМАС-лифтинг всё лицо", "category": "СМАС-лифтинг", "price": "15 000 ₽", "duration": "90 мин"},
+    {"name": "СМАС-лифтинг подбородок", "category": "СМАС-лифтинг", "price": "6 000 ₽", "duration": "30 мин"},
+    {"name": "СМАС-лифтинг подчелюстные брыли", "category": "СМАС-лифтинг", "price": "4 000 ₽", "duration": "30 мин"},
+    {"name": "СМАС-лифтинг шея", "category": "СМАС-лифтинг", "price": "8 000 ₽", "duration": "45 мин"},
+    {"name": "СМАС-лифтинг любая треть лица", "category": "СМАС-лифтинг", "price": "8 000 ₽", "duration": "45 мин"},
+    {"name": "СМАС-лифтинг мешки под глазами", "category": "СМАС-лифтинг", "price": "6 000 ₽", "duration": "30 мин"},
+    {"name": "СМАС-лифтинг веки", "category": "СМАС-лифтинг", "price": "4 000 ₽", "duration": "30 мин"},
+    {"name": "СМАС-лифтинг носогубки", "category": "СМАС-лифтинг", "price": "4 000 ₽", "duration": "30 мин"},
+    {"name": "СМАС-лифтинг тела (большая двойная зона)", "category": "СМАС-лифтинг", "price": "18 000 ₽", "duration": "90 мин"},
+    {"name": "СМАС-лифтинг тела (маленькая двойная зона)", "category": "СМАС-лифтинг", "price": "10 000 ₽", "duration": "60 мин"},
+    {"name": "СМАС-лифтинг кисти рук", "category": "СМАС-лифтинг", "price": "5 000 ₽", "duration": "30 мин"},
+    # Вакуумный массаж
+    {"name": "Вакуумный массаж до 10 мин", "category": "Вакуумный массаж", "price": "700 ₽", "duration": "10 мин"},
+    {"name": "Вакуумный массаж до 20 мин", "category": "Вакуумный массаж", "price": "1 000 ₽", "duration": "20 мин"},
+    {"name": "Вакуумный массаж до 30 мин", "category": "Вакуумный массаж", "price": "1 500 ₽", "duration": "30 мин"},
+    {"name": "Вакуумный массаж до 40 мин", "category": "Вакуумный массаж", "price": "1 800 ₽", "duration": "40 мин"},
+    {"name": "Вакуумный массаж до 60 мин", "category": "Вакуумный массаж", "price": "2 100 ₽", "duration": "60 мин"},
+    # Лицо
     {"name": "Биоревитализация и мезо без иглы", "category": "Лицо", "price": "от 4 000 ₽", "duration": "60 мин"},
     {"name": "Микроигольчатый РФ-лифтинг", "category": "Лицо", "price": "от 5 000 ₽", "duration": "60 мин"},
     {"name": "Увеличение губ без иглы", "category": "Лицо", "price": "от 3 500 ₽", "duration": "45 мин"},
     {"name": "Уходовые процедуры по лицу", "category": "Лицо", "price": "от 2 500 ₽", "duration": "60 мин"},
-    {"name": "СПА-программы", "category": "Тело", "price": "от 4 000 ₽", "duration": "90 мин"},
     {"name": "Микронидлинг", "category": "Лицо", "price": "от 4 500 ₽", "duration": "60 мин"},
-    {"name": "Липолитики", "category": "Тело", "price": "от 3 000 ₽", "duration": "45 мин"},
-    {"name": "Волосы", "category": "Волосы", "price": "уточнить", "duration": "60 мин"},
     {"name": "РФ-лифтинг тело и лицо", "category": "Лицо", "price": "от 3 500 ₽", "duration": "60 мин"},
+    # Тело
+    {"name": "СПА-программы", "category": "Тело", "price": "от 4 000 ₽", "duration": "90 мин"},
+    {"name": "Липолитики", "category": "Тело", "price": "от 3 000 ₽", "duration": "45 мин"},
+    # Волосы
+    {"name": "Волосы", "category": "Волосы", "price": "уточнить", "duration": "60 мин"},
 ]
 
 def get_conn():
@@ -153,21 +177,37 @@ def handler(event: dict, context) -> dict:
                     "body": encoded, "isBase64Encoded": True}
 
         if fmt == "html":
-            rows_html = ""
+            # Группируем по категориям
+            from collections import OrderedDict
+            cats: dict = OrderedDict()
             for s in SERVICES:
-                rows_html += f"<tr><td>{s['name']}</td><td>{s['category']}</td><td>{s['price']}</td><td>{s['duration']}</td></tr>\n"
+                cats.setdefault(s["category"], []).append(s)
+            sections = ""
+            for cat, items in cats.items():
+                rows = "".join(f"<tr><td>{i['name']}</td><td>{i['price']}</td><td>{i['duration']}</td></tr>" for i in items)
+                sections += f"<tr class='cat-header'><td colspan='3'>{cat}</td></tr>{rows}"
             today = datetime.date.today().strftime("%d.%m.%Y")
             html = f"""<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
-<title>Прайс Girly Paradise</title>
-<style>body{{font-family:Arial,sans-serif;padding:20px;color:#333}}h1{{color:#c2185b}}
-table{{width:100%;border-collapse:collapse}}th{{background:#f8bbd0;color:#c2185b;padding:10px;text-align:left}}
-td{{padding:10px;border-bottom:1px solid #fce4ec}}tr:hover td{{background:#fff5f7}}
-.footer{{margin-top:20px;color:#999;font-size:12px}}</style></head>
-<body><h1>Girly Paradise Beauty Studio</h1>
-<p>ул. Заречная, 10 · м. Парнас · +7(904)601-55-56 · Ежедневно 11:00–20:00</p>
-<table><thead><tr><th>Услуга</th><th>Категория</th><th>Стоимость</th><th>Длительность</th></tr></thead>
-<tbody>{rows_html}</tbody></table>
-<div class="footer">* Цены уточняются на консультации. Актуально на {today}.</div>
+<title>Прайс-лист Girly Paradise</title>
+<style>
+body{{font-family:'Georgia',serif;padding:24px;color:#2d1015;background:#fff5f7;margin:0}}
+h1{{color:#c2185b;font-size:24px;margin-bottom:4px;text-align:center}}
+.sub{{text-align:center;color:#888;font-size:13px;margin-bottom:20px}}
+table{{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(194,24,91,0.1)}}
+th{{background:linear-gradient(135deg,#c2185b,#e91e8c);color:white;padding:10px 14px;text-align:left;font-size:13px}}
+td{{padding:9px 14px;border-bottom:1px solid #fce4ec;font-size:13px}}
+tr:hover td{{background:#fff5f7}}
+.cat-header td{{background:#f8bbd0;color:#880e4f;font-weight:bold;font-size:13px;padding:8px 14px;letter-spacing:1px;text-transform:uppercase}}
+.footer{{margin-top:16px;color:#bbb;font-size:11px;text-align:center}}
+</style></head>
+<body>
+<h1>🌸 GIRLY PARADISE</h1>
+<div class="sub">Beauty Studio · ул. Заречная, 10 · м. Парнас · +7(904)601-55-56 · Ежедневно 11:00–20:00</div>
+<table>
+<thead><tr><th>Услуга</th><th>Стоимость</th><th>Время</th></tr></thead>
+<tbody>{sections}</tbody>
+</table>
+<div class="footer">* Точная стоимость уточняется на консультации. Актуально на {today}.</div>
 </body></html>"""
             encoded = base64.b64encode(html.encode("utf-8")).decode()
             return {"statusCode": 200, "headers": {**CORS, "Content-Type": "text/html; charset=utf-8",
