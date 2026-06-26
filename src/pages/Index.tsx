@@ -1,18 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import ReviewsPage from "./ReviewsPage";
+import ChatPage from "./ChatPage";
 
 const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/14d6f8e1-0772-4340-a687-4fe03df40989.png";
 const QR_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
 const SALON_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/890adaa5-bbaa-4546-9c4e-2406379ded6a.jpg";
+const PRICE_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/f4378294-5088-4fed-866f-23d184cb3882.jpg";
 const GALINA_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/8f8e57f4-caad-4931-8d8a-bea880feb389.jpg";
 
 const AUTH_URL = "https://functions.poehali.dev/888bfad7-6580-4f39-b963-78aca5d4d8c0";
 const CLIENTS_URL = "https://functions.poehali.dev/8e7601f2-57a9-4e42-982f-91f900c6831c";
 const SEND_BOOKING_URL = "https://functions.poehali.dev/33731d63-c7a5-4a89-b075-6b0a4282ecfc";
 
-type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin";
+type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat";
 
 const services = [
   { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
@@ -96,11 +98,18 @@ export default function Index() {
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "linear-gradient(135deg, #fff5f7 0%, #fce4ec 30%, #fdf6f8 60%, #fff0f3 100%)" }}>
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      {/* Floating sparkles */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full opacity-20"
           style={{ background: "radial-gradient(circle, hsl(335 80% 80%), transparent 70%)" }} />
         <div className="absolute bottom-[-5%] left-[-5%] w-[350px] h-[350px] rounded-full opacity-15"
           style={{ background: "radial-gradient(circle, hsl(315 70% 85%), transparent 70%)" }} />
+        {["✦","✧","✦","✧","✦","✧","✦"].map((s, i) => (
+          <div key={i} className="absolute text-pink-300 animate-float"
+            style={{ left: `${5 + i * 14}%`, top: `${15 + (i % 4) * 20}%`, fontSize: 12 + (i % 3) * 6, opacity: 0.5, animationDelay: `${i * 0.7}s` }}>
+            {s}
+          </div>
+        ))}
       </div>
 
       <div className="relative z-10 pb-24">
@@ -134,6 +143,7 @@ export default function Index() {
           <ProfilePage client={client} onLogin={handleLogin} onLogout={handleLogout} setPage={setPage} />
         )}
         {page === "reviews" && <ReviewsPage />}
+        {page === "chat" && <ChatPage />}
         {page === "admin" && <AdminPage onBack={() => setPage("home")} />}
       </div>
 
@@ -163,17 +173,25 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
         <div className="absolute inset-0" style={{
           background: "linear-gradient(to bottom, rgba(255,220,230,0.15) 0%, rgba(255,182,193,0.25) 40%, rgba(255,240,245,0.96) 100%)"
         }} />
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-start justify-between">
           <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg cursor-pointer select-none"
             style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)" }}
             onMouseDown={handleLogoPress} onMouseUp={handleLogoRelease} onMouseLeave={handleLogoRelease}
             onTouchStart={handleLogoPress} onTouchEnd={handleLogoRelease}>
             <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
           </div>
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium"
-            style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 80% 55%)", border: "1px solid hsl(335 80% 80%)" }}>
-            <Icon name="MapPin" size={12} />
-            <span>м. Парнас</span>
+          <div className="flex flex-col items-end gap-1.5 pt-1">
+            <a href="tel:+79046015556"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)", color: "hsl(335 80% 45%)", border: "1px solid hsl(335 80% 80%)" }}>
+              <Icon name="Phone" size={11} />
+              <span>+7 (904) 601-55-56</span>
+            </a>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 60% 50%)", border: "1px solid hsl(335 50% 85%)" }}>
+              <Icon name="MapPin" size={11} />
+              <span>м. Парнас · ул. Заречная, 10</span>
+            </div>
           </div>
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -186,25 +204,6 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
             style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
             🌸 Записаться сейчас
           </button>
-        </div>
-      </div>
-
-      {/* Популярные услуги */}
-      <div className="px-4 mt-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Популярные услуги</h2>
-          <button onClick={() => setPage("pricelist")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>Все →</button>
-        </div>
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-          {services.slice(0, 5).map((s, i) => (
-            <div key={s.id} className="flex-shrink-0 w-36 card-glow rounded-2xl p-4 cursor-pointer" style={{ animationDelay: `${i * 0.1}s` }} onClick={startBooking}>
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-3`}>
-                <Icon name={s.icon as any} size={18} className="text-white" />
-              </div>
-              <div className="text-sm font-medium leading-tight mb-2" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
-              <div className="text-xs font-medium" style={{ color: "hsl(335 80% 55%)" }}>Уточнить цену</div>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -282,23 +281,16 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
               <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Beauty Apartments ✨</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <a href="tel:+79046015556" className="flex items-center gap-3 group flex-1">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
-                <Icon name="Phone" size={18} style={{ color: "hsl(335 80% 55%)" }} />
-              </div>
-              <div>
-                <div className="font-semibold group-hover:underline" style={{ color: "hsl(335 50% 30%)" }}>+7 (904) 601-55-56</div>
-                <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Нажми чтобы позвонить</div>
-              </div>
-            </a>
-            <a href="https://wa.me/79046015556" target="_blank" rel="noopener noreferrer"
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:scale-105"
-              style={{ background: "hsl(142 60% 45% / 0.15)", border: "1px solid hsl(142 60% 70%)" }}>
-              <span style={{ fontSize: 18 }}>💬</span>
-            </a>
-          </div>
+          <a href="tel:+79046015556" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
+              <Icon name="Phone" size={18} style={{ color: "hsl(335 80% 55%)" }} />
+            </div>
+            <div>
+              <div className="font-semibold group-hover:underline" style={{ color: "hsl(335 50% 30%)" }}>+7 (904) 601-55-56</div>
+              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Нажми чтобы позвонить</div>
+            </div>
+          </a>
           <a href="https://yandex.ru/profile/46803820767?lang=ru" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
@@ -354,10 +346,17 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
 
   return (
     <div className="animate-fade-in">
-      <div className="px-4 pt-12 pb-3">
-        <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Прайс-лист 💅</h1>
-        <p className="text-sm mb-4" style={{ color: "hsl(335 30% 55%)" }}>Все услуги и цены</p>
+      {/* Баннер прайс-листа */}
+      <div className="relative h-44 overflow-hidden mb-4">
+        <img src={PRICE_IMG} alt="Прайс-лист" className="w-full h-full object-cover" />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(255,220,230,0.1) 0%, rgba(255,240,245,0.88) 100%)" }} />
+        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+          <h1 className="text-3xl font-oswald font-bold" style={{ color: "hsl(335 60% 28%)" }}>Прайс-лист 💅</h1>
+          <p className="text-sm" style={{ color: "hsl(335 40% 50%)" }}>Все услуги и цены</p>
+        </div>
+      </div>
 
+      <div className="px-4 pb-3">
         <div className="relative mb-3">
           <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
           <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Поиск услуги..."
@@ -508,6 +507,21 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
           price: 0,
         }),
       });
+      // Сохраняем запись в историю клиента
+      if (client?.id) {
+        const dayInfo = wDays[selectedDay];
+        const key = "gp_bookings_" + client.id;
+        const existing = JSON.parse(localStorage.getItem(key) || "[]");
+        const newBooking = {
+          id: Date.now(),
+          services: selectedServices.map((s: any) => s.name),
+          master: selectedMaster?.name || "Любой свободный",
+          day: `${dayInfo?.day}, ${dayInfo?.date} ${dayInfo?.month}`,
+          time: selectedTime,
+          status: "upcoming",
+        };
+        localStorage.setItem(key, JSON.stringify([newBooking, ...existing]));
+      }
       confirmBooking();
     } catch {
       setError("Ошибка отправки. Попробуйте ещё раз.");
@@ -888,10 +902,28 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
     );
   }
 
+  return <ProfileDashboard client={client} onLogout={onLogout} setPage={setPage} />;
+}
+
+function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout: () => void; setPage: (p: Page) => void }) {
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [tab, setTab] = useState<"upcoming" | "done">("upcoming");
+
+  useEffect(() => {
+    // Загружаем историю из localStorage (записи которые делал клиент через форму)
+    // В реальном проекте — запрос к API по client.id
+    const stored = JSON.parse(localStorage.getItem("gp_bookings_" + client.id) || "[]");
+    setBookings(stored);
+    setLoadingHistory(false);
+  }, [client.id]);
+
+  const filtered = bookings.filter((b: any) => b.status === tab);
+
   return (
     <div className="animate-fade-in">
-      <div className="px-4 pt-12 pb-6">
-        <div className="flex items-center gap-4 mb-6">
+      <div className="px-4 pt-12 pb-4">
+        <div className="flex items-center gap-4 mb-5">
           <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md"
             style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
             🌸
@@ -906,16 +938,84 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
           </button>
         </div>
 
-        <button onClick={() => setPage("booking")}
-          className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg mb-4"
-          style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
-          🌸 Записаться на услугу
-        </button>
+        {/* Кнопки действий */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <button onClick={() => setPage("booking")}
+            className="py-3.5 rounded-2xl font-semibold text-white shadow-md text-sm"
+            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+            🌸 Записаться
+          </button>
+          <button onClick={() => setPage("chat")}
+            className="py-3.5 rounded-2xl font-semibold text-sm"
+            style={{ background: "white", color: "hsl(335 70% 45%)", border: "1.5px solid hsl(335 70% 80%)" }}>
+            💬 Написать нам
+          </button>
+        </div>
 
-        <div className="card-glow rounded-2xl p-5 text-center">
-          <div className="text-4xl mb-3">✨</div>
-          <p className="font-semibold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Ты в нашей базе!</p>
-          <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Записывайся в один клик — твои данные уже сохранены</p>
+        {/* История посещений */}
+        <h3 className="text-lg font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>История посещений</h3>
+
+        <div className="flex rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
+          <button onClick={() => setTab("upcoming")}
+            className="flex-1 py-2.5 text-sm font-medium transition-all"
+            style={tab === "upcoming"
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+              : { color: "hsl(335 40% 60%)" }}>
+            Предстоящие
+          </button>
+          <button onClick={() => setTab("done")}
+            className="flex-1 py-2.5 text-sm font-medium transition-all"
+            style={tab === "done"
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+              : { color: "hsl(335 40% 60%)" }}>
+            Были у нас
+          </button>
+        </div>
+
+        <div className="space-y-3 pb-4">
+          {loadingHistory && (
+            <div className="text-center py-8">
+              <div className="text-3xl animate-float">🌸</div>
+            </div>
+          )}
+          {!loadingHistory && filtered.length === 0 && (
+            <div className="text-center py-10">
+              <div className="text-4xl mb-3">✨</div>
+              <p className="font-medium mb-1" style={{ color: "hsl(335 50% 40%)" }}>
+                {tab === "upcoming" ? "Нет предстоящих записей" : "История пока пуста"}
+              </p>
+              <p className="text-sm mb-4" style={{ color: "hsl(335 30% 60%)" }}>
+                {tab === "upcoming" ? "Запишись на процедуру прямо сейчас!" : "Запишись на первую процедуру!"}
+              </p>
+              <button onClick={() => setPage("booking")}
+                className="px-5 py-2.5 rounded-xl font-semibold text-white text-sm"
+                style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+                Записаться
+              </button>
+            </div>
+          )}
+          {filtered.map((b: any, i: number) => (
+            <div key={b.id} className="card-glow rounded-2xl p-4 animate-slide-up" style={{ animationDelay: `${i * 0.08}s` }}>
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex-1">
+                  <div className="font-semibold text-sm leading-tight" style={{ color: "hsl(335 50% 30%)" }}>
+                    {Array.isArray(b.services) ? b.services.join(", ") : (b.service || "Процедура")}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: "hsl(335 30% 60%)" }}>{b.master || "Галина Сиплатова"}</div>
+                </div>
+                <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+                  style={b.status === "upcoming"
+                    ? { background: "hsl(335 80% 60% / 0.12)", color: "hsl(335 80% 50%)", border: "1px solid hsl(335 80% 80%)" }
+                    : { background: "hsl(335 20% 93%)", color: "hsl(335 30% 65%)" }}>
+                  {b.status === "upcoming" ? "Скоро" : "Были"}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs" style={{ color: "hsl(335 30% 60%)" }}>
+                <span className="flex items-center gap-1"><Icon name="Calendar" size={11} />{b.day}</span>
+                <span className="flex items-center gap-1"><Icon name="Clock" size={11} />{b.time}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -1005,8 +1105,8 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "pricelist", icon: "ClipboardList", label: "Прайс" },
-    { id: "masters", icon: "Users", label: "Мастера" },
     { id: "booking", icon: "CalendarPlus", label: "Записаться" },
+    { id: "chat", icon: "MessageCircle", label: "Чат" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
 
