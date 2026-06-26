@@ -10,22 +10,26 @@ const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b918
 type Page = "home" | "services" | "masters" | "booking" | "profile";
 
 const services = [
-  { id: 5, name: "Чистка лица", category: "Косметология", price: 3200, duration: 90, icon: "Heart", color: "from-rose-500 to-pink-600" },
-  { id: 6, name: "Массаж лица", category: "Косметология", price: 2800, duration: 60, icon: "Wind", color: "from-teal-500 to-cyan-600" },
-  { id: 10, name: "Ламинирование ресниц", category: "Брови и ресницы", price: 2000, duration: 90, icon: "Eye", color: "from-pink-500 to-purple-600" },
-  { id: 11, name: "Окрашивание ресниц", category: "Брови и ресницы", price: 800, duration: 30, icon: "Droplet", color: "from-fuchsia-500 to-pink-600" },
-  { id: 12, name: "Ламинирование бровей", category: "Брови и ресницы", price: 1500, duration: 60, icon: "Sparkles", color: "from-rose-500 to-fuchsia-600" },
-  { id: 13, name: "Окрашивание бровей", category: "Брови и ресницы", price: 700, duration: 30, icon: "Brush", color: "from-amber-500 to-rose-500" },
+  { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
+  { id: 2, name: "Вакуумный массаж", category: "Тело", price: 0, duration: 60, icon: "Wind", color: "from-teal-500 to-cyan-600" },
+  { id: 3, name: "СМАС-лифтинг", category: "Лицо", price: 0, duration: 90, icon: "Zap", color: "from-yellow-500 to-orange-500" },
+  { id: 4, name: "Биоревитализация и мезо без иглы", category: "Лицо", price: 0, duration: 60, icon: "Droplets", color: "from-blue-500 to-indigo-600" },
+  { id: 5, name: "Микроигольчатый РФ-лифтинг", category: "Лицо", price: 0, duration: 60, icon: "Sparkles", color: "from-fuchsia-500 to-pink-600" },
+  { id: 6, name: "Увеличение губ без иглы", category: "Лицо", price: 0, duration: 45, icon: "Heart", color: "from-rose-500 to-pink-600" },
+  { id: 7, name: "Уходовые процедуры по лицу", category: "Лицо", price: 0, duration: 60, icon: "Star", color: "from-pink-500 to-rose-600" },
+  { id: 8, name: "СПА-программы", category: "Тело", price: 0, duration: 90, icon: "Flower", color: "from-purple-500 to-pink-600" },
+  { id: 9, name: "Микронидлинг", category: "Лицо", price: 0, duration: 60, icon: "CircleDot", color: "from-indigo-500 to-purple-600" },
+  { id: 10, name: "Липолитики", category: "Тело", price: 0, duration: 45, icon: "Flame", color: "from-orange-500 to-red-600" },
+  { id: 11, name: "Волосы", category: "Волосы", price: 0, duration: 60, icon: "Scissors", color: "from-amber-500 to-yellow-600" },
+  { id: 12, name: "РФ-лифтинг тело и лицо", category: "Лицо", price: 0, duration: 60, icon: "Waves", color: "from-violet-500 to-purple-600" },
 ];
 
-const categories = ["Все", "Косметология", "Брови и ресницы"];
+const categories = ["Все", "Лицо", "Тело", "Волосы"];
 
 const GALINA_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/8f8e57f4-caad-4931-8d8a-bea880feb389.jpg";
-const KSENIA_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/c37f5198-3009-45a2-8b43-f0f0dd39d20f.jpg";
 
 const masters = [
-  { id: 1, name: "Галина Сиплатова", spec: "Косметолог-эстетист", rating: 5.0, reviews: 312, img: GALINA_IMG, tags: ["Чистка лица", "Массаж лица", "Омоложение", "Коррекция фигуры"] },
-  { id: 2, name: "Ксения", spec: "Мастер бровей и ресниц", rating: 5.0, reviews: 184, img: KSENIA_IMG, tags: ["Ламинирование ресниц", "Окрашивание ресниц", "Ламинирование бровей", "Окрашивание бровей"] },
+  { id: 1, name: "Галина Сиплатова", spec: "Косметолог-эстетист", rating: 5.0, reviews: 312, img: GALINA_IMG, tags: ["СМАС-лифтинг", "Биоревитализация", "РФ-лифтинг", "Криолиполиз"] },
 ];
 
 const timeSlots = ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
@@ -164,21 +168,6 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
         </div>
       </div>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-3 px-4 -mt-4 relative z-10 mb-6">
-        {[
-          { val: "4000+", label: "Клиентов", icon: "Users" },
-          { val: "4.9★", label: "Рейтинг", icon: "Star" },
-          { val: "8+", label: "Услуг", icon: "Sparkles" },
-        ].map((item) => (
-          <div key={item.label} className="card-glow rounded-2xl p-3 text-center">
-            <Icon name={item.icon} fallback="Circle" size={18} className="mx-auto mb-1" style={{ color: "hsl(315 100% 65%)" }} />
-            <div className="text-lg font-bold font-oswald text-white">{item.val}</div>
-            <div className="text-xs text-white/50">{item.label}</div>
-          </div>
-        ))}
-      </div>
-
       {/* Popular services */}
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -197,7 +186,7 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
                 <Icon name={s.icon as any} size={18} className="text-white" />
               </div>
               <div className="text-sm font-medium text-white leading-tight mb-2">{s.name}</div>
-              <div className="text-xs" style={{ color: "hsl(315 100% 65%)" }}>{s.price} ₽</div>
+              <div className="text-xs" style={{ color: "hsl(315 100% 65%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить цену"}</div>
             </div>
           ))}
         </div>
@@ -281,16 +270,7 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
               <div className="text-white/40 text-xs">Санкт-Петербург · м. Парнас · открыть на карте →</div>
             </div>
           </a>
-          <a href="https://vk.ru/girly_paradise_spb" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "hsl(220 80% 55% / 0.15)" }}>
-              <span style={{ fontSize: 18 }}>💙</span>
-            </div>
-            <div>
-              <div className="text-white font-semibold group-hover:underline">ВКонтакте</div>
-              <div className="text-white/40 text-xs">@girly_paradise_spb</div>
-            </div>
-          </a>
+
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "hsl(185 100% 55% / 0.15)" }}>
@@ -366,7 +346,7 @@ function ServicesPage({ filteredServices, categories, activeCategory, setActiveC
               <div className="text-white/40 text-xs mt-0.5">{s.category} · {s.duration} мин</div>
             </div>
             <div className="text-right flex-shrink-0">
-              <div className="font-bold font-oswald text-lg" style={{ color: "hsl(315 100% 65%)" }}>{s.price} ₽</div>
+              <div className="font-bold font-oswald text-lg" style={{ color: "hsl(315 100% 65%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить"}</div>
               <div className="text-xs text-white/30">за сеанс</div>
             </div>
           </div>
