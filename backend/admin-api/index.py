@@ -240,5 +240,49 @@ def handler(event: dict, context) -> dict:
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"chats": rows})
 
+    # ── ПРОФИЛЬ ВЛАДЕЛЬЦА ──
+    if section == "profile":
+        if body.get("action") == "save":
+            fields = ["name","surname","birthdate","site_name","phone","email","specialization","about","vk_url","instagram_url","telegram_url","whatsapp_url"]
+            sets = ", ".join(f"{f} = %s" for f in fields if f in body)
+            vals = [body[f] for f in fields if f in body]
+            if vals:
+                cur.execute(f"UPDATE {SCHEMA}.owner_profile SET updated_at=NOW(), {sets} WHERE id=1", vals)
+                conn.commit()
+            conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.owner_profile WHERE id=1")
+        row = cur.fetchone()
+        conn.close(); return resp({"profile": dict(row) if row else {}})
+
+    # ── ДОХОДЫ ──
+    if section == "income":
+        if body.get("action") == "add":
+            cur.execute(f"INSERT INTO {SCHEMA}.income (title, amount, category, income_date, notes) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                        (body.get("title",""), float(body.get("amount",0)), body.get("category","Услуги"),
+                         body.get("income_date", ""), body.get("notes","")))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "delete":
+            cur.execute(f"DELETE FROM {SCHEMA}.income WHERE id = %s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.income ORDER BY income_date DESC, created_at DESC LIMIT 100")
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.execute(f"SELECT COALESCE(SUM(amount),0) as v FROM {SCHEMA}.income"); total = float(cur.fetchone()["v"])
+        cur.execute(f"SELECT COALESCE(SUM(amount),0) as v FROM {SCHEMA}.income WHERE income_date >= DATE_TRUNC('month', NOW())"); month = float(cur.fetchone()["v"])
+        conn.close(); return resp({"income": rows, "total": total, "month": month})
+
+    # ── РАБОЧЕЕ РАСПИСАНИЕ ──
+    if section == "work_schedule":
+        if body.get("action") == "save":
+            for day in body.get("days", []):
+                cur.execute(f"""
+                    UPDATE {SCHEMA}.work_schedule SET is_working=%s, time_from=%s, time_to=%s, notes=%s
+                    WHERE day_of_week=%s
+                """, (day.get("is_working",True), day.get("time_from","11:00"), day.get("time_to","20:00"), day.get("notes",""), day.get("day_of_week")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.work_schedule ORDER BY day_of_week")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"days": rows})
+
     conn.close()
     return resp({"error": "Unknown section"}, 400)

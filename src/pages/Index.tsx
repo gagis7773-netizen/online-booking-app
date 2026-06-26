@@ -254,67 +254,22 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
         </div>
       </div>
 
-      {/* ВКонтакте */}
+      {/* ВКонтакте — только QR без синей кнопки */}
       <div className="px-4 mb-5">
         <div className="card-glow rounded-3xl p-5 text-center">
           <div className="font-oswald font-bold text-lg mb-1" style={{ color: "hsl(335 60% 30%)" }}>Мы ВКонтакте</div>
           <div className="text-xs mb-3" style={{ color: "hsl(335 30% 55%)" }}>Акции, новости и запись онлайн</div>
-          <div className="flex justify-center mb-3">
+          <a href="https://vk.ru/world_of_galis" target="_blank" rel="noopener noreferrer" className="flex justify-center">
             <div className="w-44 h-44 rounded-2xl overflow-hidden shadow-md border-2" style={{ borderColor: "hsl(335 50% 88%)" }}>
               <img src={QR_IMG} alt="QR-код группы ВКонтакте" className="w-full h-full object-cover" />
             </div>
-          </div>
-          <a href="https://vk.com/id903571459" target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white text-sm shadow-md"
-            style={{ background: "linear-gradient(135deg, #4c75a3, #5b8ec2)" }}>
-            Открыть страницу
           </a>
         </div>
       </div>
 
-      {/* Контакты */}
-      <div className="px-4 mb-2">
-        <div className="card-glow rounded-3xl p-5 space-y-4">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
-              <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1 bg-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-oswald font-semibold leading-tight" style={{ color: "hsl(335 60% 30%)" }}>Girly Paradise</h2>
-              <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Beauty Apartments ✨</p>
-            </div>
-          </div>
-          <a href="tel:+79046015556" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
-              <Icon name="Phone" size={18} style={{ color: "hsl(335 80% 55%)" }} />
-            </div>
-            <div>
-              <div className="font-semibold group-hover:underline" style={{ color: "hsl(335 50% 30%)" }}>+7 (904) 601-55-56</div>
-              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Нажми чтобы позвонить</div>
-            </div>
-          </a>
-          <a href="https://yandex.ru/profile/46803820767?lang=ru" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
-              <Icon name="MapPin" size={18} style={{ color: "hsl(335 80% 55%)" }} />
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold group-hover:underline" style={{ color: "hsl(335 50% 30%)" }}>ул. Заречная, 10</div>
-              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Санкт-Петербург · м. Парнас · открыть на карте →</div>
-            </div>
-          </a>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
-              <Icon name="Clock" size={18} style={{ color: "hsl(335 80% 55%)" }} />
-            </div>
-            <div>
-              <div className="font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Ежедневно: 11:00 – 20:00</div>
-              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Без выходных</div>
-            </div>
-          </div>
-        </div>
+      {/* Копирайт внизу */}
+      <div className="px-4 pb-4 text-center">
+        <p className="text-xs" style={{ color: "hsl(335 20% 70%)" }}>Все права защищены 2026</p>
       </div>
     </div>
   );
@@ -483,6 +438,7 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [messenger, setMessenger] = useState<"whatsapp" | "telegram" | "vk" | null>(null);
 
   const toggleService = (s: any) => {
     setSelectedServices((prev: any[]) =>
@@ -744,7 +700,7 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
             </div>
           )}
 
-          <div className="card-glow rounded-2xl p-4 mb-6 space-y-3">
+          <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
             <div>
               <span className="text-xs uppercase tracking-wider" style={{ color: "hsl(335 40% 65%)" }}>Услуги</span>
               <div className="flex flex-wrap gap-1 mt-1">
@@ -771,6 +727,32 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
                 <span className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>Клиент</span>
                 <span className="font-medium text-sm" style={{ color: "hsl(335 50% 30%)" }}>{client.name} · {client.phone}</span>
               </div>
+            )}
+          </div>
+
+          {/* Выбор мессенджера для подтверждения */}
+          <div className="mb-4">
+            <p className="text-xs font-medium mb-2" style={{ color: "hsl(335 40% 55%)" }}>Получить подтверждение через:</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: "whatsapp" as const, label: "WhatsApp", emoji: "💚", color: "hsl(142 60% 45%)" },
+                { id: "telegram" as const, label: "Telegram", emoji: "✈️", color: "hsl(200 80% 50%)" },
+                { id: "vk" as const, label: "ВКонтакте", emoji: "🔵", color: "hsl(214 60% 50%)" },
+              ].map(m => (
+                <button key={m.id} onClick={() => setMessenger(messenger === m.id ? null : m.id)}
+                  className="py-3 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-all"
+                  style={messenger === m.id
+                    ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white", border: "none" }
+                    : { background: "white", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 40% 88%)" }}>
+                  <span className="text-lg">{m.emoji}</span>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {messenger && (
+              <p className="text-xs mt-2 text-center" style={{ color: "hsl(335 30% 60%)" }}>
+                Подтверждение придёт в {messenger === "whatsapp" ? "WhatsApp" : messenger === "telegram" ? "Telegram" : "ВКонтакте"} после записи
+              </p>
             )}
           </div>
 
@@ -1063,7 +1045,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1215,6 +1197,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "gallery" && <AdminGallery />}
       {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
+      {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
     </div>
   );
 }
@@ -1555,14 +1538,34 @@ function AdminNotifications() {
 
 // ── Расходы ──
 function AdminExpenses() {
+  const [tab, setTab] = useState<"expenses" | "income">("expenses");
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="flex rounded-2xl overflow-hidden mb-5" style={{ background: "hsl(335 30% 92%)" }}>
+        <button onClick={() => setTab("expenses")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
+          style={tab === "expenses" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+          💸 Расходы
+        </button>
+        <button onClick={() => setTab("income")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
+          style={tab === "income" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+          💰 Доходы
+        </button>
+      </div>
+      {tab === "expenses" ? <ExpensesTab /> : <IncomeTab />}
+    </div>
+  );
+}
+
+function ExpensesTab() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [totals, setTotals] = useState({ total: 0, month: 0 });
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ title: "", amount: "", category: "Расходники", expense_date: new Date().toISOString().slice(0, 10), notes: "" });
   const [saving, setSaving] = useState(false);
-
   const cats = ["Расходники", "Аренда", "Оборудование", "Реклама", "Зарплата", "Прочее"];
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
   const load = () => adminPost("expenses").then(d => {
     setItems(d.expenses || []); setTotals({ total: d.total || 0, month: d.month || 0 }); setLoading(false);
@@ -1577,37 +1580,24 @@ function AdminExpenses() {
     setAdding(false); setSaving(false); load();
   };
 
-  const del = async (id: number) => {
-    await adminPost("expenses", { action: "delete", id }); load();
-  };
-
-  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
-
   return (
-    <div className="px-4 pb-6">
+    <>
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="card-glow rounded-2xl p-4">
           <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{totals.month.toLocaleString()} ₽</div>
-          <div className="text-xs" style={PS}>Расходы в этом месяце</div>
+          <div className="text-xs" style={PS}>За этот месяц</div>
         </div>
         <div className="card-glow rounded-2xl p-4">
           <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{totals.total.toLocaleString()} ₽</div>
-          <div className="text-xs" style={PS}>Всего за всё время</div>
+          <div className="text-xs" style={PS}>Всего</div>
         </div>
       </div>
-
       <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
         {adding ? "✕ Отмена" : "+ Добавить расход"}
       </button>
-
       {adding && (
         <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
-          {[
-            { key: "title", label: "Название", ph: "Косметика, аренда..." },
-            { key: "amount", label: "Сумма, ₽", ph: "5000" },
-            { key: "expense_date", label: "Дата", ph: "2026-06-27" },
-            { key: "notes", label: "Примечание", ph: "Необязательно" },
-          ].map(f => (
+          {[{ key: "title", label: "Название", ph: "Косметика, аренда..." }, { key: "amount", label: "Сумма, ₽", ph: "5000" }, { key: "expense_date", label: "Дата", ph: "" }, { key: "notes", label: "Примечание", ph: "Необязательно" }].map(f => (
             <div key={f.key}>
               <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
               <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
@@ -1619,7 +1609,7 @@ function AdminExpenses() {
             <div className="flex flex-wrap gap-2">
               {cats.map(c => (
                 <button key={c} onClick={() => setForm(p => ({ ...p, category: c }))}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium"
                   style={form.category === c ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
                   {c}
                 </button>
@@ -1631,7 +1621,6 @@ function AdminExpenses() {
           </button>
         </div>
       )}
-
       {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
       <div className="space-y-2">
         {items.map(item => (
@@ -1642,15 +1631,103 @@ function AdminExpenses() {
                 <div className="text-xs" style={PS}>{item.category} · {item.expense_date}</div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-bold font-oswald" style={{ color: "hsl(335 80% 55%)" }}>{Number(item.amount).toLocaleString()} ₽</span>
-                <button onClick={() => del(item.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+                <span className="font-bold font-oswald" style={{ color: "hsl(0 60% 50%)" }}>{Number(item.amount).toLocaleString()} ₽</span>
+                <button onClick={async () => { await adminPost("expenses", { action: "delete", id: item.id }); load(); }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
               </div>
             </div>
           </div>
         ))}
         {!loading && items.length === 0 && <div className="text-center py-8 text-sm" style={PS}>Расходов нет</div>}
       </div>
-    </div>
+    </>
+  );
+}
+
+function IncomeTab() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totals, setTotals] = useState({ total: 0, month: 0 });
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title: "", amount: "", category: "Услуги", income_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [saving, setSaving] = useState(false);
+  const cats = ["Услуги", "Чаевые", "Продажа косметики", "Абонемент", "Прочее"];
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const load = () => adminPost("income").then(d => {
+    setItems(d.income || []); setTotals({ total: d.total || 0, month: d.month || 0 }); setLoading(false);
+  });
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.title || !form.amount) return;
+    setSaving(true);
+    await adminPost("income", { action: "add", ...form, amount: parseFloat(form.amount) });
+    setForm({ title: "", amount: "", category: "Услуги", income_date: new Date().toISOString().slice(0, 10), notes: "" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="card-glow rounded-2xl p-4">
+          <div className="text-xl font-oswald font-bold" style={{ color: "hsl(142 60% 40%)" }}>{totals.month.toLocaleString()} ₽</div>
+          <div className="text-xs" style={PS}>За этот месяц</div>
+        </div>
+        <div className="card-glow rounded-2xl p-4">
+          <div className="text-xl font-oswald font-bold" style={{ color: "hsl(142 60% 40%)" }}>{totals.total.toLocaleString()} ₽</div>
+          <div className="text-xs" style={PS}>Всего</div>
+        </div>
+      </div>
+      <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {adding ? "✕ Отмена" : "+ Добавить доход"}
+      </button>
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          {[{ key: "title", label: "Описание", ph: "Криолиполиз, СМАС..." }, { key: "amount", label: "Сумма, ₽", ph: "3000" }, { key: "income_date", label: "Дата", ph: "" }, { key: "notes", label: "Примечание", ph: "Необязательно" }].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+              <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            </div>
+          ))}
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Категория</label>
+            <div className="flex flex-wrap gap-2">
+              {cats.map(c => (
+                <button key={c} onClick={() => setForm(p => ({ ...p, category: c }))}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium"
+                  style={form.category === c ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "Сохранить"}
+          </button>
+        </div>
+      )}
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-2">
+        {items.map(item => (
+          <div key={item.id} className="card-glow rounded-2xl p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="font-semibold text-sm" style={P}>{item.title}</div>
+                <div className="text-xs" style={PS}>{item.category} · {item.income_date}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold font-oswald" style={{ color: "hsl(142 60% 40%)" }}>+{Number(item.amount).toLocaleString()} ₽</span>
+                <button onClick={async () => { await adminPost("income", { action: "delete", id: item.id }); load(); }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!loading && items.length === 0 && <div className="text-center py-8 text-sm" style={PS}>Доходов нет</div>}
+      </div>
+    </>
   );
 }
 
@@ -1846,10 +1923,169 @@ function AdminStaff({ currentStaffId }: { currentStaffId: number }) {
   );
 }
 
+// ── Профиль владельца ──
+function AdminProfile({ onLogout }: { onLogout: () => void }) {
+  const [profile, setProfile] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  useEffect(() => {
+    adminPost("profile").then(d => setProfile(d.profile || {}));
+  }, []);
+
+  const set = (key: string, val: string) => setProfile((p: any) => ({ ...p, [key]: val }));
+
+  const save = async () => {
+    setSaving(true);
+    await adminPost("profile", { action: "save", ...profile });
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  if (!profile) return <div className="text-center py-10"><div className="text-3xl animate-float">🌸</div></div>;
+
+  return (
+    <div className="px-4 pb-6 space-y-3">
+      <div className="flex items-center gap-4 mb-4">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl text-white font-bold" style={GRAD}>
+          {(profile.name || "Г")[0]}
+        </div>
+        <div>
+          <div className="font-oswald font-bold text-lg" style={P}>{profile.name} {profile.surname}</div>
+          <div className="text-xs" style={PS}>{profile.specialization}</div>
+        </div>
+      </div>
+
+      {[
+        { key: "name", label: "Имя" },
+        { key: "surname", label: "Фамилия" },
+        { key: "birthdate", label: "Дата рождения", type: "date" },
+        { key: "site_name", label: "Название сайта" },
+        { key: "phone", label: "Телефон" },
+        { key: "email", label: "Почта" },
+        { key: "specialization", label: "Специализация" },
+      ].map(f => (
+        <div key={f.key}>
+          <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+          <input value={profile[f.key] || ""} onChange={e => set(f.key, e.target.value)}
+            type={f.type || "text"}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+        </div>
+      ))}
+
+      <div>
+        <label className="text-xs font-medium block mb-1" style={PS}>О себе</label>
+        <textarea value={profile.about || ""} onChange={e => set("about", e.target.value)} rows={3}
+          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+      </div>
+
+      <p className="text-xs font-semibold pt-1" style={PS}>Социальные сети</p>
+      {[
+        { key: "vk_url", label: "ВКонтакте", ph: "https://vk.ru/..." },
+        { key: "instagram_url", label: "Instagram", ph: "https://instagram.com/..." },
+        { key: "telegram_url", label: "Telegram", ph: "https://t.me/..." },
+        { key: "whatsapp_url", label: "WhatsApp", ph: "https://wa.me/..." },
+      ].map(f => (
+        <div key={f.key}>
+          <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+          <input value={profile[f.key] || ""} onChange={e => set(f.key, e.target.value)}
+            placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+        </div>
+      ))}
+
+      <button onClick={save} disabled={saving}
+        className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg" style={GRAD}>
+        {saved ? "Сохранено ✓" : saving ? "Сохраняем..." : "Сохранить профиль"}
+      </button>
+
+      <button onClick={onLogout}
+        className="w-full py-3 rounded-2xl font-semibold text-sm mt-2"
+        style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+        Выйти из учётной записи
+      </button>
+    </div>
+  );
+}
+
+// ── Рабочее расписание ──
+function AdminWorkSchedule() {
+  const DAY_NAMES = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+  const [days, setDays] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  useEffect(() => {
+    adminPost("work_schedule").then(d => {
+      const sorted = (d.days || []).sort((a: any, b: any) => ((a.day_of_week + 6) % 7) - ((b.day_of_week + 6) % 7));
+      setDays(sorted); setLoading(false);
+    });
+  }, []);
+
+  const update = (idx: number, key: string, val: any) => {
+    setDays(prev => prev.map((d, i) => i === idx ? { ...d, [key]: val } : d));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    await adminPost("work_schedule", { action: "save", days });
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  if (loading) return <div className="text-center py-10"><div className="text-3xl animate-float">🌸</div></div>;
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-4" style={PS}>Укажи рабочие дни и часы — они будут отображаться для клиентов</p>
+      <div className="space-y-3">
+        {days.map((day, i) => {
+          const dayIdx = (day.day_of_week + 6) % 7;
+          return (
+            <div key={day.day_of_week} className="card-glow rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-sm" style={P}>{DAY_NAMES[dayIdx]}</span>
+                <button onClick={() => update(i, "is_working", !day.is_working)}
+                  className="px-3 py-1 rounded-full text-xs font-semibold transition-all"
+                  style={day.is_working
+                    ? { ...GRAD, color: "white" }
+                    : { background: "hsl(335 20% 93%)", color: "hsl(335 30% 65%)" }}>
+                  {day.is_working ? "Рабочий" : "Выходной"}
+                </button>
+              </div>
+              {day.is_working && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs block mb-1" style={PS}>С</label>
+                    <input type="time" value={day.time_from || "11:00"} onChange={e => update(i, "time_from", e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs block mb-1" style={PS}>До</label>
+                    <input type="time" value={day.time_to || "20:00"} onChange={e => update(i, "time_to", e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={save} disabled={saving} className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg mt-4" style={GRAD}>
+        {saved ? "Сохранено ✓" : saving ? "Сохраняем..." : "Сохранить расписание"}
+      </button>
+    </div>
+  );
+}
+
 // ── Настройки ──
 function AdminSettings() {
   const SITE_URL = window.location.href;
   const [copied, setCopied] = useState(false);
+  const [adminSection, setAdminSection] = useState<"main" | "profile" | "schedule">("main");
+  const session = loadAdminSession();
 
   const copy = () => {
     navigator.clipboard.writeText(SITE_URL);
@@ -1857,8 +2093,58 @@ function AdminSettings() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (adminSection === "profile") return (
+    <div>
+      <div className="px-4 pt-2 pb-3">
+        <button onClick={() => setAdminSection("main")} className="flex items-center gap-2 text-sm" style={PS}>
+          <Icon name="ChevronLeft" size={16} /> Назад
+        </button>
+      </div>
+      <AdminProfile onLogout={() => { clearAdminSession(); window.location.reload(); }} />
+    </div>
+  );
+
+  if (adminSection === "schedule") return (
+    <div>
+      <div className="px-4 pt-2 pb-3">
+        <button onClick={() => setAdminSection("main")} className="flex items-center gap-2 text-sm" style={PS}>
+          <Icon name="ChevronLeft" size={16} /> Назад
+        </button>
+        <h2 className="text-lg font-oswald font-semibold mt-1" style={P}>Рабочее расписание</h2>
+      </div>
+      <AdminWorkSchedule />
+    </div>
+  );
+
   return (
-    <div className="px-4 pb-6 space-y-4">
+    <div className="px-4 pb-6 space-y-3">
+      {/* Профиль */}
+      <button onClick={() => setAdminSection("profile")}
+        className="w-full card-glow rounded-2xl p-4 flex items-center gap-3 text-left hover:scale-[1.01] transition-all">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0" style={GRAD}>
+          {(session?.name || "Г")[0]}
+        </div>
+        <div className="flex-1">
+          <div className="font-semibold text-sm" style={P}>{session?.name || "Владелец"}</div>
+          <div className="text-xs" style={PS}>Редактировать профиль →</div>
+        </div>
+        <Icon name="ChevronRight" size={18} style={PS} />
+      </button>
+
+      {/* Рабочее расписание */}
+      <button onClick={() => setAdminSection("schedule")}
+        className="w-full card-glow rounded-2xl p-4 flex items-center gap-3 text-left hover:scale-[1.01] transition-all">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(200 80% 92%)" }}>
+          <Icon name="CalendarDays" size={18} style={{ color: "hsl(200 80% 40%)" }} />
+        </div>
+        <div className="flex-1">
+          <div className="font-semibold text-sm" style={P}>Рабочее расписание</div>
+          <div className="text-xs" style={PS}>Дни работы и часы →</div>
+        </div>
+        <Icon name="ChevronRight" size={18} style={PS} />
+      </button>
+
       <div className="card-glow rounded-2xl p-4">
         <div className="font-semibold mb-1 text-sm" style={P}>Ссылка на сайт</div>
         <div className="text-xs mb-3 break-all" style={PS}>{SITE_URL}</div>
@@ -1868,23 +2154,16 @@ function AdminSettings() {
       </div>
 
       <div className="card-glow rounded-2xl p-4">
-        <div className="font-semibold mb-1 text-sm" style={P}>Контакты салона</div>
-        <div className="space-y-1 text-xs" style={PS}>
-          <div>📞 +7 (904) 601-55-56</div>
-          <div>📍 ул. Заречная, 10, м. Парнас</div>
-          <div>🕐 Ежедневно 11:00–20:00</div>
-          <div>📧 Siplatova777@list.ru</div>
-        </div>
-      </div>
-
-      <div className="card-glow rounded-2xl p-4">
         <div className="font-semibold mb-1 text-sm" style={P}>Доступ в панель</div>
-        <div className="text-xs" style={PS}>Удержи логотип на главной странице 2 секунды — откроется панель владельца</div>
+        <div className="text-xs" style={PS}>Удержи логотип на главной 2 секунды → введи пин-код</div>
       </div>
 
       <div className="card-glow rounded-2xl p-4">
-        <div className="font-semibold mb-2 text-sm" style={P}>Уведомления на почту</div>
-        <div className="text-xs" style={PS}>При каждой новой записи клиента на процедуру автоматически приходит письмо на <span style={{ color: "hsl(335 80% 55%)" }}>Siplatova777@list.ru</span></div>
+        <div className="font-semibold mb-2 text-sm" style={P}>Уведомления о записях</div>
+        <div className="text-xs" style={PS}>
+          📧 Письмо на <span style={{ color: "hsl(335 80% 55%)" }}>Siplatova777@list.ru</span><br />
+          📱 SMS на +7 (904) 601-55-56
+        </div>
       </div>
     </div>
   );
