@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ChatPage from "./ChatPage";
+import PromotionsPage from "./PromotionsPage";
+import GalleryPage from "./GalleryPage";
+import ReviewsPage from "./ReviewsPage";
 
 const HERO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/6b57d904-553a-4a99-8cb9-fe605cdc050f.jpg";
 const MASTER_IMG1 = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/e395c63f-3160-4bb4-8eb0-3f30851c376c.jpg";
 const TEAM_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/04d60e29-907d-4125-ad17-d755f9dc780a.jpg";
 const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/91d2850b-d07b-4736-9ab4-23d3cca534fa.png";
 
-type Page = "home" | "services" | "masters" | "booking" | "profile";
+type Page = "home" | "services" | "masters" | "booking" | "profile" | "chat" | "promotions" | "gallery" | "reviews";
 
 const services = [
   { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
@@ -134,6 +138,10 @@ export default function Index() {
           />
         )}
         {page === "profile" && <ProfilePage myBookings={myBookings} />}
+        {page === "chat" && <ChatPage />}
+        {page === "promotions" && <PromotionsPage onBook={() => setPage("booking")} />}
+        {page === "gallery" && <GalleryPage />}
+        {page === "reviews" && <ReviewsPage />}
       </div>
 
       {/* Bottom Nav */}
@@ -255,6 +263,26 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
         </div>
       </div>
 
+      {/* Quick links */}
+      <div className="px-4 mb-5">
+        <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { icon: "Tag", label: "Акции", sub: "Скидки и спецпредложения", page: "promotions", emoji: "🎁" },
+            { icon: "Images", label: "Галерея", sub: "Результаты до и после", page: "gallery", emoji: "✨" },
+            { icon: "Star", label: "Отзывы", sub: "Мнения клиентов", page: "reviews", emoji: "⭐" },
+            { icon: "MessageCircle", label: "Написать нам", sub: "Ответим в чате", page: "chat", emoji: "💬" },
+          ].map(item => (
+            <button key={item.page} onClick={() => setPage(item.page as any)}
+              className="card-glow rounded-2xl p-4 text-left hover:scale-105 transition-all">
+              <div className="text-2xl mb-2">{item.emoji}</div>
+              <div className="font-semibold text-sm mb-0.5" style={{ color: "hsl(335 50% 30%)" }}>{item.label}</div>
+              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{item.sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* CTA */}
       <div className="px-4 mb-6">
         <button
@@ -332,7 +360,16 @@ function ServicesPage({ filteredServices, categories, activeCategory, setActiveC
   return (
     <div className="animate-fade-in">
       <div className="px-4 pt-12 pb-4">
-        <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Услуги 🌸</h1>
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-3xl font-oswald font-bold" style={{ color: "hsl(335 60% 30%)" }}>Услуги 🌸</h1>
+          <a href="https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941/pricelist?format=csv"
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
+            style={{ background: "hsl(335 80% 60% / 0.1)", color: "hsl(335 80% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+            <Icon name="Download" size={13} />
+            Прайс
+          </a>
+        </div>
         <p className="text-sm mb-4" style={{ color: "hsl(335 30% 55%)" }}>Выбери что тебе нужно</p>
 
         {/* Search */}
@@ -716,6 +753,25 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
             </div>
           </div>
 
+          {/* Предоплата */}
+          <div className="card-glow rounded-2xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="CreditCard" size={16} style={{ color: "hsl(335 80% 55%)" }} />
+              <span className="text-sm font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Предоплата (необязательно)</span>
+            </div>
+            <p className="text-xs mb-3" style={{ color: "hsl(335 30% 60%)" }}>Внесите предоплату для гарантии записи. Оставшаяся сумма — на месте.</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[0, 500, 1000].map(amt => (
+                <button key={amt} type="button"
+                  className="py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "hsl(335 30% 95%)", color: "hsl(335 50% 45%)", border: "1px solid hsl(335 40% 85%)" }}>
+                  {amt === 0 ? "Без предоплаты" : `${amt} ₽`}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-2" style={{ color: "hsl(335 30% 65%)" }}>Реквизиты для перевода уточните в чате или по телефону</p>
+          </div>
+
           {error && (
             <p className="text-red-500 text-sm text-center mb-3">{error}</p>
           )}
@@ -846,22 +902,26 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "services", icon: "Sparkles", label: "Услуги" },
-    { id: "masters", icon: "Users", label: "Мастера" },
+    { id: "promotions", icon: "Tag", label: "Акции" },
+    { id: "gallery", icon: "Images", label: "Галерея" },
+    { id: "reviews", icon: "Star", label: "Отзывы" },
+    { id: "chat", icon: "MessageCircle", label: "Чат" },
     { id: "booking", icon: "CalendarPlus", label: "Записаться" },
+    { id: "masters", icon: "Users", label: "Мастера" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-2 pb-2">
-      <div className="rounded-3xl px-2 py-3 flex justify-around shadow-lg"
-        style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)", border: "1px solid hsl(335 40% 88%)" }}>
+      <div className="rounded-3xl px-1 py-3 flex gap-0.5 overflow-x-auto scrollbar-hide shadow-lg"
+        style={{ background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px)", border: "1px solid hsl(335 40% 88%)" }}>
         {items.map((item) => (
-          <button key={item.id} onClick={() => setPage(item.id)}
-            className="flex flex-col items-center gap-1 px-3 py-1 rounded-2xl transition-all"
+          <button key={item.id} onClick={() => setPage(item.id as Page)}
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-2xl transition-all flex-shrink-0"
             style={page === item.id ? { background: "hsl(335 80% 60% / 0.12)" } : {}}>
-            <Icon name={item.icon as any} size={20}
+            <Icon name={item.icon as any} size={18}
               style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }} />
-            <span className="text-xs font-medium"
+            <span className="text-[10px] font-medium whitespace-nowrap"
               style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }}>
               {item.label}
             </span>

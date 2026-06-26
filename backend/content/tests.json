@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "Root endpoint",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 404,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
