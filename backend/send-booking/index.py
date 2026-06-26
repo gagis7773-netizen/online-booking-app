@@ -141,8 +141,22 @@ def handler(event: dict, context) -> dict:
         pass
 
     # SMS владельцу
-    sms_text = f"Girly Paradise: новая запись! {name} ({phone}). Услуга: {service}. {day} в {time}. Мастер: {master}."
-    send_sms_owner(sms_text)
+    sms_owner = f"Girly Paradise: новая запись! {name} ({phone}). Услуга: {service}. {day} в {time}. Мастер: {master}."
+    send_sms_owner(sms_owner)
+
+    # SMS клиенту (если есть телефон)
+    if phone:
+        sms_client = f"Girly Paradise: ваша запись подтверждена! Услуга: {service}. {day} в {time}. Мастер: {master}. Ждём вас! Адрес: ул. Заречная, 10, м. Парнас."
+        api_id = os.environ.get("SMSRU_API_ID", "")
+        if api_id:
+            clean = ''.join(c for c in phone if c.isdigit())
+            if clean.startswith('8'):
+                clean = '7' + clean[1:]
+            params = urllib.parse.urlencode({"api_id": api_id, "to": clean, "msg": sms_client, "json": 1})
+            try:
+                urllib.request.urlopen(f"https://sms.ru/sms/send?{params}", timeout=8)
+            except:
+                pass
 
     with smtplib.SMTP_SSL("smtp.mail.ru", 465) as server:
         server.login(smtp_user, smtp_password)

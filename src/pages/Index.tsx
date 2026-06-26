@@ -242,13 +242,16 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, emoji: "💅" },
-            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, emoji: "🖼" },
-            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, emoji: "⭐" },
+            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList" },
+            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images" },
+            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star" },
           ].map(item => (
             <button key={item.page} onClick={() => setPage(item.page)}
               className="card-glow rounded-2xl p-4 text-left hover:scale-105 transition-all">
-              <div className="text-2xl mb-2">{item.emoji}</div>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: "hsl(335 80% 60% / 0.1)", border: "1px solid hsl(335 70% 85%)" }}>
+                <Icon name={item.icon as any} size={18} style={{ color: "hsl(335 75% 52%)" }} />
+              </div>
               <div className="font-semibold text-sm mb-0.5" style={{ color: "hsl(335 50% 30%)" }}>{item.label}</div>
               <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{item.sub}</div>
             </button>
@@ -2082,96 +2085,296 @@ function AdminPricelistEditor() {
   );
 }
 
-// ── Рассылка ──
+// ── Рассылка и уведомления ──
 function AdminBroadcast() {
+  const [tab, setTab] = useState<"templates" | "custom" | "personal">("templates");
   const [message, setMessage] = useState("");
-  const [channels, setChannels] = useState<string[]>(["chat"]);
+  const [channels, setChannels] = useState<string[]>(["sms"]);
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [tab, setTab] = useState<"send" | "history">("send");
+  const [result, setResult] = useState<string | null>(null);
+
+  // Для личного уведомления
+  const [clients, setClients] = useState<any[]>([]);
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientMsg, setClientMsg] = useState("");
+  const [clientChannels, setClientChannels] = useState<string[]>(["sms"]);
+  const [personalSending, setPersonalSending] = useState(false);
+  const [personalResult, setPersonalResult] = useState<string | null>(null);
 
   useEffect(() => {
-    adminPost("broadcast_log" as any).catch(() => {});
+    adminPost("clients").then(d => setClients(d.clients || []));
   }, []);
 
-  const toggleChannel = (ch: string) => setChannels(prev => prev.includes(ch) ? prev.filter(x => x !== ch) : [...prev, ch]);
+  const PHONE = "+79046015556"; // телефон салона
 
-  const send = async () => {
-    if (!message.trim() || channels.length === 0) return;
-    setSending(true); setResult(null);
-    const data = await adminPost("broadcast", { message, channels });
-    setResult(data); setSending(false);
-    setMessage("");
-  };
+  const templates = [
+    {
+      id: "remind",
+      label: "Напоминание о записи",
+      icon: "Bell",
+      color: "from-blue-500 to-indigo-500",
+      text: "Girly Paradise: напоминаем, что вы записаны на процедуру. Ждём вас! Адрес: ул. Заречная, 10, м. Парнас. Тел: " + PHONE,
+    },
+    {
+      id: "book",
+      label: "Запись подтверждена",
+      icon: "CalendarCheck",
+      color: "from-emerald-500 to-teal-500",
+      text: "Girly Paradise: ваша запись подтверждена! Ждём вас по адресу ул. Заречная, 10, м. Парнас. Есть вопросы? Звоните: " + PHONE,
+    },
+    {
+      id: "cancel",
+      label: "Запись отменена",
+      icon: "CalendarX",
+      color: "from-red-500 to-rose-500",
+      text: "Girly Paradise: ваша запись отменена. Если хотите перенести — позвоните нам: " + PHONE + " или запишитесь снова на сайте.",
+    },
+    {
+      id: "review",
+      label: "Просьба оставить отзыв",
+      icon: "Star",
+      color: "from-yellow-500 to-amber-500",
+      text: "Girly Paradise: спасибо, что были у нас! Будем рады, если оставите отзыв — это очень важно для нас 🌸 " + PHONE,
+    },
+    {
+      id: "promo",
+      label: "Запишитесь снова",
+      icon: "Sparkles",
+      color: "from-pink-500 to-rose-500",
+      text: "Girly Paradise: уже давно не были у нас? Приходите на процедуры! Запись: " + PHONE + " или онлайн на сайте.",
+    },
+  ];
 
   const channelList = [
-    { id: "chat", label: "Чат на сайте", emoji: "💬", desc: "Всем кто писал в чат" },
-    { id: "sms", label: "SMS", emoji: "📱", desc: "На телефоны всех клиентов" },
+    { id: "sms", label: "SMS", emoji: "📱" },
+    { id: "whatsapp", label: "WhatsApp", emoji: "💚" },
+    { id: "telegram", label: "Telegram", emoji: "✈️" },
+    { id: "chat", label: "Чат сайта", emoji: "💬" },
   ];
+
+  const toggle = (ch: string, list: string[], setList: (v: string[]) => void) =>
+    setList(list.includes(ch) ? list.filter(x => x !== ch) : [...list, ch]);
+
+  const buildLinks = (phone: string, msg: string, chs: string[]) => {
+    const p = phone.replace(/\D/g, "");
+    const enc = encodeURIComponent(msg);
+    const links: { label: string; url: string; emoji: string }[] = [];
+    if (chs.includes("whatsapp")) links.push({ label: "WhatsApp", url: `https://wa.me/${p}?text=${enc}`, emoji: "💚" });
+    if (chs.includes("telegram")) links.push({ label: "Telegram", url: `https://t.me/+${p}`, emoji: "✈️" });
+    return links;
+  };
+
+  // Массовая рассылка через SMS/чат
+  const sendBroadcast = async () => {
+    if (!message.trim()) return;
+    const smsChs = channels.filter(c => c === "sms" || c === "chat");
+    if (smsChs.length === 0) {
+      // Только мессенджеры — подсказываем ссылки
+      setResult("Для WhatsApp/Telegram рассылки используй «Личное уведомление» — отправь каждому клиенту вручную через кнопку.");
+      return;
+    }
+    setSending(true); setResult(null);
+    const data = await adminPost("broadcast", { message, channels: smsChs });
+    setResult(data.ok ? `✓ Отправлено ${data.sent || 0} получателям` : "Ошибка. Проверь настройки SMS.ru");
+    setSending(false);
+    if (data.ok) setMessage("");
+  };
+
+  const filteredClients = clients.filter(c =>
+    c.name?.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone?.includes(clientSearch)
+  );
+
+  // Личное уведомление клиенту
+  const sendPersonal = async () => {
+    if (!selectedClient || !clientMsg.trim()) return;
+    const smsChs = clientChannels.filter(c => c === "sms");
+    setPersonalSending(true); setPersonalResult(null);
+    if (smsChs.length > 0) {
+      const data = await adminPost("notifications", { action: "send", phone: selectedClient.phone, message: clientMsg, client_id: selectedClient.id });
+      if (data.ok) setPersonalResult("sms_sent");
+    }
+    setPersonalSending(false);
+    if (clientChannels.filter(c => c !== "sms" && c !== "chat").length > 0) {
+      setPersonalResult("links");
+    } else if (!personalResult) {
+      setPersonalResult("sms_sent");
+    }
+  };
+
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
   return (
     <div className="px-4 pb-6">
+      {/* Вкладки */}
       <div className="flex rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
-        <button onClick={() => setTab("send")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
-          style={tab === "send" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>Отправить</button>
-        <button onClick={() => setTab("history")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
-          style={tab === "history" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>История</button>
+        {[
+          { id: "templates", label: "Шаблоны" },
+          { id: "custom", label: "Всем" },
+          { id: "personal", label: "Лично" },
+        ].map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id as any); setResult(null); setPersonalResult(null); }}
+            className="flex-1 py-2.5 text-xs font-semibold transition-all"
+            style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {tab === "send" && (
+      {/* ШАБЛОНЫ */}
+      {tab === "templates" && (
+        <div className="space-y-3">
+          <p className="text-xs mb-3" style={PS}>Выбери шаблон — текст подставится автоматически. Затем перейди во вкладку «Всем» или «Лично».</p>
+          {templates.map(t => (
+            <button key={t.id} onClick={() => { setMessage(t.text); setClientMsg(t.text); setTab("personal"); }}
+              className="w-full card-glow rounded-2xl p-4 text-left hover:scale-[1.01] transition-all">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center flex-shrink-0`}>
+                  <Icon name={t.icon as any} size={18} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={P}>{t.label}</div>
+                  <div className="text-xs mt-0.5 truncate" style={PS}>{t.text.slice(0, 55)}...</div>
+                </div>
+                <Icon name="ChevronRight" size={16} style={PS} />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* МАССОВАЯ РАССЫЛКА */}
+      {tab === "custom" && (
         <div className="space-y-4">
+          <div className="p-3 rounded-xl text-xs" style={{ background: "hsl(335 80% 97%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 70% 88%)" }}>
+            💡 SMS и чат на сайте отправляются всем сразу. Для WhatsApp/Telegram — используй вкладку «Лично».
+          </div>
           <div>
-            <label className="text-xs font-medium block mb-2" style={PS}>Каналы рассылки</label>
-            <div className="space-y-2">
+            <p className="text-xs font-medium mb-2" style={PS}>Каналы рассылки</p>
+            <div className="flex gap-2 flex-wrap">
               {channelList.map(ch => (
-                <button key={ch.id} onClick={() => toggleChannel(ch.id)}
-                  className="w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all"
+                <button key={ch.id} onClick={() => toggle(ch.id, channels, setChannels)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
                   style={channels.includes(ch.id)
-                    ? { background: "hsl(335 80% 60% / 0.1)", border: "1.5px solid hsl(335 80% 70%)" }
-                    : { background: "white", border: "1.5px solid hsl(335 30% 90%)" }}>
-                  <span className="text-2xl">{ch.emoji}</span>
-                  <div>
-                    <div className="font-semibold text-sm" style={P}>{ch.label}</div>
-                    <div className="text-xs" style={PS}>{ch.desc}</div>
-                  </div>
-                  <div className="ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                    style={channels.includes(ch.id) ? { ...GRAD, borderColor: "transparent" } : { borderColor: "hsl(335 30% 80%)" }}>
-                    {channels.includes(ch.id) && <Icon name="Check" size={10} className="text-white" />}
-                  </div>
+                    ? { ...GRAD, color: "white" }
+                    : { background: "white", color: "hsl(335 50% 45%)", border: "1px solid hsl(335 40% 85%)" }}>
+                  {ch.emoji} {ch.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Текст сообщения</label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
+              placeholder="Текст для всех клиентов..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={inp} />
+            <div className="text-xs mt-1 text-right" style={PS}>{message.length} символов</div>
+          </div>
+          {result && (
+            <div className="p-3 rounded-xl text-sm font-medium text-center"
+              style={{ background: result.startsWith("✓") ? "hsl(142 60% 94%)" : "hsl(50 90% 95%)", color: result.startsWith("✓") ? "hsl(142 60% 35%)" : "hsl(40 70% 35%)" }}>
+              {result}
+            </div>
+          )}
+          <button onClick={sendBroadcast} disabled={sending || !message.trim()}
+            className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg"
+            style={message.trim() ? GRAD : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+            {sending ? "Отправляем..." : "🚀 Разослать всем клиентам"}
+          </button>
+        </div>
+      )}
+
+      {/* ЛИЧНОЕ УВЕДОМЛЕНИЕ */}
+      {tab === "personal" && (
+        <div className="space-y-4">
+          {/* Поиск клиента */}
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Выбери клиента</label>
+            <input value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Имя или телефон..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-2" style={inp} />
+            {clientSearch && (
+              <div className="max-h-44 overflow-y-auto space-y-1 mb-2">
+                {filteredClients.slice(0, 8).map(c => (
+                  <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(""); setPersonalResult(null); }}
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl text-left"
+                    style={selectedClient?.id === c.id
+                      ? { background: "hsl(335 80% 60% / 0.1)", border: "1px solid hsl(335 70% 80%)" }
+                      : { background: "hsl(335 80% 98%)", border: "1px solid hsl(335 30% 92%)" }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={GRAD}>
+                      {c.name?.[0]?.toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium" style={P}>{c.name}</div>
+                      <div className="text-xs" style={PS}>{c.phone}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedClient && (
+              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "hsl(335 80% 60% / 0.08)", border: "1px solid hsl(335 70% 82%)" }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={GRAD}>
+                  {selectedClient.name?.[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold" style={P}>{selectedClient.name}</div>
+                  <div className="text-xs" style={PS}>{selectedClient.phone}</div>
+                </div>
+                <button onClick={() => { setSelectedClient(null); setPersonalResult(null); }} className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>✕</button>
+              </div>
+            )}
+          </div>
+
+          {/* Каналы */}
+          <div>
+            <p className="text-xs font-medium mb-2" style={PS}>Как отправить</p>
+            <div className="flex gap-2 flex-wrap">
+              {channelList.map(ch => (
+                <button key={ch.id} onClick={() => toggle(ch.id, clientChannels, setClientChannels)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                  style={clientChannels.includes(ch.id)
+                    ? { ...GRAD, color: "white" }
+                    : { background: "white", color: "hsl(335 50% 45%)", border: "1px solid hsl(335 40% 85%)" }}>
+                  {ch.emoji} {ch.label}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Сообщение */}
           <div>
             <label className="text-xs font-medium block mb-1" style={PS}>Текст сообщения</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
-              placeholder="Напишите сообщение для клиентов..."
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
-              style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
-            <div className="text-xs mt-1 text-right" style={PS}>{message.length} символов</div>
+            <textarea value={clientMsg} onChange={e => setClientMsg(e.target.value)} rows={4}
+              placeholder="Текст для клиента..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={inp} />
           </div>
 
-          {result && (
-            <div className="p-3 rounded-xl text-sm font-medium text-center"
-              style={{ background: result.ok ? "hsl(142 60% 94%)" : "hsl(0 60% 95%)", color: result.ok ? "hsl(142 60% 35%)" : "hsl(0 60% 50%)" }}>
-              {result.ok ? `✓ Отправлено ${result.sent || 0} получателям` : "Ошибка отправки"}
+          {/* Ссылки мессенджеров (после отправки или если выбраны) */}
+          {selectedClient && clientChannels.some(c => ["whatsapp", "telegram"].includes(c)) && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium" style={PS}>Открыть диалог в мессенджере:</p>
+              {buildLinks(selectedClient.phone, clientMsg || " ", clientChannels).map(link => (
+                <a key={link.label} href={link.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-2 w-full py-3 px-4 rounded-xl font-semibold text-sm"
+                  style={{ background: "hsl(335 80% 60% / 0.08)", color: "hsl(335 70% 40%)", border: "1px solid hsl(335 60% 85%)" }}>
+                  <span>{link.emoji}</span> Написать в {link.label}
+                </a>
+              ))}
             </div>
           )}
 
-          <button onClick={send} disabled={sending || !message.trim() || channels.length === 0}
-            className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg"
-            style={message.trim() && channels.length > 0 ? GRAD : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
-            {sending ? "Отправляем..." : `🚀 Отправить рассылку (${channels.length} канал${channels.length > 1 ? "а" : ""})`}
-          </button>
-        </div>
-      )}
+          {personalResult === "sms_sent" && (
+            <div className="p-3 rounded-xl text-sm font-medium text-center"
+              style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>
+              ✓ SMS отправлено
+            </div>
+          )}
 
-      {tab === "history" && (
-        <div className="text-center py-10 text-sm" style={PS}>
-          <div className="text-3xl mb-3">📋</div>
-          История рассылок сохраняется в базе данных
+          <button onClick={sendPersonal} disabled={personalSending || !selectedClient || !clientMsg.trim()}
+            className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg"
+            style={selectedClient && clientMsg.trim() ? GRAD : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+            {personalSending ? "Отправляем..." : "📤 Отправить"}
+          </button>
         </div>
       )}
     </div>
