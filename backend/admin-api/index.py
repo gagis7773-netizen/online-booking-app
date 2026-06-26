@@ -284,5 +284,133 @@ def handler(event: dict, context) -> dict:
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"days": rows})
 
+    # ── ПАПКИ ГАЛЕРЕИ ──
+    if section == "gallery_folders":
+        if body.get("action") == "add":
+            cur.execute(f"INSERT INTO {SCHEMA}.gallery_folders (name, description, cover_url, sort_order) VALUES (%s,%s,%s,%s) RETURNING id",
+                        (body.get("name",""), body.get("description",""), body.get("cover_url",""), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "update":
+            cur.execute(f"UPDATE {SCHEMA}.gallery_folders SET name=%s, description=%s, cover_url=%s WHERE id=%s",
+                        (body.get("name",""), body.get("description",""), body.get("cover_url",""), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "deactivate":
+            cur.execute(f"UPDATE {SCHEMA}.gallery_folders SET sort_order=-1 WHERE id=%s AND id NOT IN (SELECT id FROM {SCHEMA}.gallery_folders WHERE sort_order=-1)", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.gallery_folders WHERE sort_order >= 0 ORDER BY sort_order, id")
+        folders = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"folders": folders})
+
+    # ── ГАЛЕРЕЯ (с папками) ──
+    if section == "gallery":
+        if body.get("action") == "add":
+            cur.execute(f"INSERT INTO {SCHEMA}.admin_gallery (title, url, category, folder_id) VALUES (%s,%s,%s,%s) RETURNING id",
+                        (body.get("title",""), body.get("url",""), body.get("category",""), body.get("folder_id")))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "deactivate":
+            cur.execute(f"UPDATE {SCHEMA}.admin_gallery SET category='archived' WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        folder_id = body.get("folder_id")
+        if folder_id:
+            cur.execute(f"SELECT * FROM {SCHEMA}.admin_gallery WHERE folder_id=%s AND category!='archived' ORDER BY created_at DESC", (folder_id,))
+        else:
+            cur.execute(f"SELECT * FROM {SCHEMA}.admin_gallery WHERE category!='archived' ORDER BY created_at DESC")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"gallery": rows})
+
+    # ── ПРАЙС-ЛИСТ КАСТОМНЫЙ ──
+    if section == "pricelist_custom":
+        if body.get("action") == "add":
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.pricelist_custom (name, category, price, duration, description, photo_url, sort_order)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            """, (body.get("name",""), body.get("category",""), body.get("price",""), body.get("duration",""),
+                  body.get("description",""), body.get("photo_url",""), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "update":
+            cur.execute(f"""
+                UPDATE {SCHEMA}.pricelist_custom
+                SET name=%s, category=%s, price=%s, duration=%s, description=%s, photo_url=%s
+                WHERE id=%s
+            """, (body.get("name",""), body.get("category",""), body.get("price",""), body.get("duration",""),
+                  body.get("description",""), body.get("photo_url",""), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "toggle":
+            cur.execute(f"UPDATE {SCHEMA}.pricelist_custom SET is_active = NOT is_active WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "deactivate":
+            cur.execute(f"UPDATE {SCHEMA}.pricelist_custom SET is_active=false WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        active_only = body.get("active_only", False)
+        if active_only:
+            cur.execute(f"SELECT * FROM {SCHEMA}.pricelist_custom WHERE is_active=true ORDER BY category, sort_order, id")
+        else:
+            cur.execute(f"SELECT * FROM {SCHEMA}.pricelist_custom ORDER BY category, sort_order, id")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"items": rows})
+
+    # ── РАССЫЛКА ──
+    if section == "broadcast":
+        message = body.get("message","")
+        channels = body.get("channels", [])
+        sent_count = 0
+        if "sms" in channels:
+            cur.execute(f"SELECT id, phone FROM {SCHEMA}.clients")
+            clients = cur.fetchall()
+            for c in clients:
+                if send_sms(c["phone"], message):
+                    sent_count += 1
+        # Для чата — вставляем сообщение в каждый чат как "системное"
+        if "chat" in channels:
+            cur.execute(f"SELECT id FROM {SCHEMA}.chats")
+            chats = cur.fetchall()
+            for ch in chats:
+                cur.execute(f"""
+                    INSERT INTO {SCHEMA}.chat_messages (chat_id, sender, content, message_type)
+                    VALUES (%s, 'admin', %s, 'text')
+                """, (ch["id"], message))
+            sent_count += len(chats)
+        cur.execute(f"INSERT INTO {SCHEMA}.broadcast_log (message, channels, sent_count) VALUES (%s,%s,%s)",
+                    (message, ",".join(channels), sent_count))
+        conn.commit(); conn.close(); return resp({"ok": True, "sent": sent_count})
+
+    # ── ФИНАНСЫ ПО МЕСЯЦАМ ──
+    if section == "monthly_finance":
+        # Пересчитываем и сохраняем текущий месяц
+        if body.get("action") == "recalc":
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.monthly_finance (year, month, total_income, total_expenses, profit)
+                SELECT EXTRACT(YEAR FROM income_date)::int, EXTRACT(MONTH FROM income_date)::int,
+                       COALESCE(SUM(amount),0), 0, COALESCE(SUM(amount),0)
+                FROM {SCHEMA}.income
+                WHERE income_date IS NOT NULL AND income_date != ''
+                GROUP BY EXTRACT(YEAR FROM income_date), EXTRACT(MONTH FROM income_date)
+                ON CONFLICT (year, month) DO UPDATE SET
+                  total_income = EXCLUDED.total_income,
+                  updated_at = NOW()
+            """)
+            cur.execute(f"""
+                UPDATE {SCHEMA}.monthly_finance mf SET
+                  total_expenses = sub.exp,
+                  profit = mf.total_income - sub.exp,
+                  updated_at = NOW()
+                FROM (
+                  SELECT EXTRACT(YEAR FROM expense_date::date)::int as yr,
+                         EXTRACT(MONTH FROM expense_date::date)::int as mo,
+                         COALESCE(SUM(amount),0) as exp
+                  FROM {SCHEMA}.expenses
+                  WHERE expense_date IS NOT NULL AND expense_date != ''
+                  GROUP BY yr, mo
+                ) sub
+                WHERE mf.year = sub.yr AND mf.month = sub.mo
+            """)
+            conn.commit()
+        cur.execute(f"SELECT * FROM {SCHEMA}.monthly_finance ORDER BY year DESC, month DESC LIMIT 24")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"months": rows})
+
     conn.close()
     return resp({"error": "Unknown section"}, 400)

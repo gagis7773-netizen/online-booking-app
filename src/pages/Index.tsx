@@ -17,7 +17,7 @@ const SEND_BOOKING_URL = "https://functions.poehali.dev/33731d63-c7a5-4a89-b075-
 const adminPost = (section: string, extra?: object) =>
   fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
 
-type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat";
+type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery";
 
 const services = [
   { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
@@ -146,6 +146,7 @@ export default function Index() {
           <ProfilePage client={client} onLogin={handleLogin} onLogout={handleLogout} setPage={setPage} />
         )}
         {page === "reviews" && <ReviewsPage />}
+        {page === "gallery" && <ClientGalleryPage setPage={setPage} />}
         {page === "chat" && <ChatPage />}
         {page === "admin" && <AdminPage onBack={() => setPage("home")} />}
       </div>
@@ -242,6 +243,7 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, emoji: "💅" },
+            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, emoji: "🖼" },
             { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, emoji: "⭐" },
           ].map(item => (
             <button key={item.page} onClick={() => setPage(item.page)}
@@ -283,12 +285,28 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
   const [activeCategory, setActiveCategory] = useState("Все");
   const [searchQuery, setSearchQuery] = useState("");
 
-  if (!priceLoaded) {
-    fetch("https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941/pricelist")
-      .then(r => r.json())
-      .then(d => { setPriceItems(d.services || []); setPriceLoaded(true); })
+  useEffect(() => {
+    // Сначала пробуем кастомный прайс из БД
+    adminPost("pricelist_custom", { active_only: true })
+      .then(d => {
+        if (d.items && d.items.length > 0) {
+          setPriceItems(d.items.map((it: any) => ({
+            name: it.name,
+            category: it.category,
+            price: it.price || "Уточнить",
+            duration: it.duration || "",
+            photo_url: it.photo_url || "",
+          })));
+          setPriceLoaded(true);
+        } else {
+          // Фолбэк на старый API
+          return fetch("https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941/pricelist")
+            .then(r => r.json())
+            .then(d2 => { setPriceItems(d2.services || []); setPriceLoaded(true); });
+        }
+      })
       .catch(() => setPriceLoaded(true));
-  }
+  }, []);
 
   const cats = ["Все", ...Array.from(new Set(priceItems.map((s: any) => s.category)))];
   const filtered = priceItems.filter((s: any) => {
@@ -350,9 +368,13 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
             </div>
             <div className="card-glow rounded-2xl overflow-hidden">
               {items.map((item: any, i: number) => (
-                <div key={i} className="flex items-center justify-between px-4 py-3"
+                <div key={i} className="flex items-center gap-3 px-4 py-3"
                   style={{ borderBottom: i < items.length - 1 ? "1px solid hsl(335 30% 92%)" : "none" }}>
-                  <div className="flex-1 text-sm pr-2" style={{ color: "hsl(335 50% 30%)" }}>{item.name}</div>
+                  {item.photo_url && (
+                    <img src={item.photo_url} alt={item.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+                      onError={e => (e.currentTarget.style.display = "none")} />
+                  )}
+                  <div className="flex-1 text-sm min-w-0" style={{ color: "hsl(335 50% 30%)" }}>{item.name}</div>
                   <div className="text-right flex-shrink-0">
                     <div className="font-bold text-sm" style={{ color: "hsl(335 80% 50%)" }}>{item.price}</div>
                     <div className="text-xs" style={{ color: "hsl(335 20% 65%)" }}>{item.duration}</div>
@@ -1045,7 +1067,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1082,6 +1104,8 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500", ownerOnly: true },
     { id: "expenses", icon: "Wallet", label: "Расходы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
+    { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
+    { id: "broadcast", icon: "Send", label: "Рассылка", color: "from-sky-500 to-blue-500", ownerOnly: true },
     { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
   ];
@@ -1194,7 +1218,9 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "messages" && <AdminMessages />}
       {section === "notifications" && isOwner && <AdminNotifications />}
       {section === "expenses" && isOwner && <AdminExpenses />}
-      {section === "gallery" && <AdminGallery />}
+      {section === "gallery" && <AdminGalleryFolders />}
+      {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
+      {section === "broadcast" && isOwner && <AdminBroadcast />}
       {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
       {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
@@ -1538,7 +1564,7 @@ function AdminNotifications() {
 
 // ── Расходы ──
 function AdminExpenses() {
-  const [tab, setTab] = useState<"expenses" | "income">("expenses");
+  const [tab, setTab] = useState<"expenses" | "income" | "monthly">("expenses");
 
   return (
     <div className="px-4 pb-6">
@@ -1551,9 +1577,88 @@ function AdminExpenses() {
           style={tab === "income" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
           💰 Доходы
         </button>
+        <button onClick={() => setTab("monthly")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
+          style={tab === "monthly" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+          📊 Сводка
+        </button>
       </div>
-      {tab === "expenses" ? <ExpensesTab /> : <IncomeTab />}
+      {tab === "expenses" && <ExpensesTab />}
+      {tab === "income" && <IncomeTab />}
+      {tab === "monthly" && <MonthlyFinanceTab />}
     </div>
+  );
+}
+
+function MonthlyFinanceTab() {
+  const [months, setMonths] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [recalculating, setRecalculating] = useState(false);
+
+  const MONTH_NAMES = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+
+  const load = () => {
+    setLoading(true);
+    adminPost("monthly_finance").then(d => { setMonths(d.months || []); setLoading(false); });
+  };
+
+  const recalc = async () => {
+    setRecalculating(true);
+    await adminPost("monthly_finance", { action: "recalc" });
+    setRecalculating(false);
+    load();
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <>
+      <button onClick={recalc} disabled={recalculating}
+        className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {recalculating ? "Считаем..." : "🔄 Пересчитать сводку"}
+      </button>
+      <p className="text-xs mb-4" style={PS}>Нажми «Пересчитать» чтобы обновить данные на основе внесённых доходов и расходов</p>
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      {!loading && months.length === 0 && (
+        <div className="text-center py-10">
+          <div className="text-4xl mb-3">📋</div>
+          <p className="text-sm" style={PS}>Нажми «Пересчитать» чтобы собрать данные</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {months.map(m => {
+          const profit = Number(m.profit);
+          const income = Number(m.total_income);
+          const expenses = Number(m.total_expenses);
+          return (
+            <div key={m.id} className="card-glow rounded-2xl p-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-oswald font-bold text-base" style={P}>{MONTH_NAMES[m.month]} {m.year}</span>
+                <span className="font-bold font-oswald text-base" style={{ color: profit >= 0 ? "hsl(142 60% 40%)" : "hsl(0 60% 50%)" }}>
+                  {profit >= 0 ? "+" : ""}{profit.toLocaleString()} ₽
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl p-2 text-center" style={{ background: "hsl(142 60% 96%)" }}>
+                  <div className="text-sm font-bold" style={{ color: "hsl(142 60% 35%)" }}>+{income.toLocaleString()} ₽</div>
+                  <div className="text-xs" style={PS}>Доходы</div>
+                </div>
+                <div className="rounded-xl p-2 text-center" style={{ background: "hsl(0 60% 97%)" }}>
+                  <div className="text-sm font-bold" style={{ color: "hsl(0 60% 50%)" }}>−{expenses.toLocaleString()} ₽</div>
+                  <div className="text-xs" style={PS}>Расходы</div>
+                </div>
+              </div>
+              {income > 0 && (
+                <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "hsl(0 60% 92%)" }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (income - expenses) / income * 100)}%`, background: "hsl(142 60% 45%)" }} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -1731,71 +1836,437 @@ function IncomeTab() {
   );
 }
 
-// ── Галерея ──
-function AdminGallery() {
-  const [items, setItems] = useState<any[]>([]);
+// ── Галерея (папки) — для админа ──
+function AdminGalleryFolders() {
+  const [folders, setFolders] = useState<any[]>([]);
+  const [activeFolder, setActiveFolder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ title: "", url: "", category: "До и после" });
+  const [addingFolder, setAddingFolder] = useState(false);
+  const [addingPhoto, setAddingPhoto] = useState(false);
+  const [folderForm, setFolderForm] = useState({ name: "", description: "", cover_url: "" });
+  const [photoForm, setPhotoForm] = useState({ url: "", title: "" });
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
-  const load = () => adminPost("gallery").then(d => { setItems(d.gallery || []); setLoading(false); });
-  useEffect(() => { load(); }, []);
+  const loadFolders = () => adminPost("gallery_folders").then(d => { setFolders(d.folders || []); setLoading(false); });
+  useEffect(() => { loadFolders(); }, []);
 
-  const save = async () => {
-    if (!form.url) return;
+  const loadPhotos = (folderId: number) => {
+    setPhotosLoading(true);
+    adminPost("gallery", { folder_id: folderId }).then(d => { setPhotos(d.gallery || []); setPhotosLoading(false); });
+  };
+
+  const openFolder = (f: any) => { setActiveFolder(f); setAddingPhoto(false); loadPhotos(f.id); };
+
+  const addFolder = async () => {
+    if (!folderForm.name) return;
     setSaving(true);
-    await adminPost("gallery", { action: "add", ...form });
-    setForm({ title: "", url: "", category: "До и после" });
-    setAdding(false); setSaving(false); load();
+    await adminPost("gallery_folders", { action: "add", ...folderForm });
+    setFolderForm({ name: "", description: "", cover_url: "" });
+    setAddingFolder(false); setSaving(false); loadFolders();
   };
 
-  const del = async (id: number) => {
-    await adminPost("gallery", { action: "delete", id }); load();
+  const addPhoto = async () => {
+    if (!photoForm.url || !activeFolder) return;
+    setSaving(true);
+    await adminPost("gallery", { action: "add", ...photoForm, folder_id: activeFolder.id, category: activeFolder.name });
+    setPhotoForm({ url: "", title: "" });
+    setAddingPhoto(false); setSaving(false); loadPhotos(activeFolder.id);
   };
 
-  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+  const removePhoto = async (id: number) => {
+    await adminPost("gallery", { action: "deactivate", id }); loadPhotos(activeFolder.id);
+  };
 
-  return (
+  if (activeFolder) return (
     <div className="px-4 pb-6">
-      <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
-        {adding ? "✕ Отмена" : "+ Добавить фото"}
+      <button onClick={() => { setActiveFolder(null); setPhotos([]); }} className="flex items-center gap-2 text-sm mb-4" style={PS}>
+        <Icon name="ChevronLeft" size={16} /> Все папки
       </button>
+      <h2 className="text-lg font-oswald font-bold mb-1" style={P}>{activeFolder.name}</h2>
+      {activeFolder.description && <p className="text-xs mb-4" style={PS}>{activeFolder.description}</p>}
 
-      {adding && (
+      <button onClick={() => setAddingPhoto(!addingPhoto)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {addingPhoto ? "✕ Отмена" : "+ Добавить фото"}
+      </button>
+      {addingPhoto && (
         <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
           <div>
             <label className="text-xs font-medium block mb-1" style={PS}>Ссылка на фото (URL)</label>
-            <input value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..."
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            <input value={photoForm.url} onChange={e => setPhotoForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
           </div>
           <div>
-            <label className="text-xs font-medium block mb-1" style={PS}>Название</label>
-            <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Необязательно"
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            <label className="text-xs font-medium block mb-1" style={PS}>Подпись (необязательно)</label>
+            <input value={photoForm.title} onChange={e => setPhotoForm(p => ({ ...p, title: e.target.value }))} placeholder="Описание фото"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
           </div>
-          {form.url && <img src={form.url} className="w-full h-40 object-cover rounded-xl" alt="preview" />}
-          <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
-            {saving ? "Сохраняем..." : "Добавить"}
+          {photoForm.url && <img src={photoForm.url} className="w-full h-40 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
+          <button onClick={addPhoto} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Добавляем..." : "Добавить фото"}
           </button>
         </div>
       )}
 
-      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      {photosLoading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
       <div className="grid grid-cols-2 gap-3">
-        {items.map(item => (
-          <div key={item.id} className="card-glow rounded-2xl overflow-hidden relative">
-            <img src={item.url} alt={item.title} className="w-full h-36 object-cover" />
-            <div className="p-2">
-              <div className="text-xs font-medium truncate" style={P}>{item.title || item.category}</div>
-            </div>
-            <button onClick={() => del(item.id)}
+        {photos.map(ph => (
+          <div key={ph.id} className="card-glow rounded-2xl overflow-hidden relative">
+            <img src={ph.url} alt={ph.title} className="w-full h-36 object-cover" />
+            {ph.title && <div className="px-2 py-1.5 text-xs truncate" style={P}>{ph.title}</div>}
+            <button onClick={() => removePhoto(ph.id)}
               className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ background: "rgba(255,255,255,0.9)", color: "hsl(0 60% 55%)" }}>✕</button>
+              style={{ background: "rgba(255,255,255,0.92)", color: "hsl(0 60% 55%)" }}>✕</button>
           </div>
         ))}
-        {!loading && items.length === 0 && <div className="col-span-2 text-center py-8 text-sm" style={PS}>Галерея пуста</div>}
+        {!photosLoading && photos.length === 0 && (
+          <div className="col-span-2 text-center py-8 text-sm" style={PS}>В папке пока нет фото</div>
+        )}
       </div>
+    </div>
+  );
+
+  return (
+    <div className="px-4 pb-6">
+      <button onClick={() => setAddingFolder(!addingFolder)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {addingFolder ? "✕ Отмена" : "+ Создать папку"}
+      </button>
+      {addingFolder && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          {[{ key: "name", label: "Название папки", ph: "До и после, Лицо, Тело..." }, { key: "description", label: "Описание", ph: "Необязательно" }, { key: "cover_url", label: "URL обложки", ph: "https://..." }].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+              <input value={(folderForm as any)[f.key]} onChange={e => setFolderForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+            </div>
+          ))}
+          <button onClick={addFolder} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Создаём..." : "Создать"}
+          </button>
+        </div>
+      )}
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="grid grid-cols-2 gap-3">
+        {folders.map(f => (
+          <button key={f.id} onClick={() => openFolder(f)} className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
+            {f.cover_url
+              ? <img src={f.cover_url} className="w-full h-28 object-cover" alt={f.name} />
+              : <div className="w-full h-28 flex items-center justify-center text-4xl" style={{ background: "hsl(335 80% 96%)" }}>🖼</div>}
+            <div className="p-3">
+              <div className="font-semibold text-sm truncate" style={P}>{f.name}</div>
+              {f.description && <div className="text-xs truncate mt-0.5" style={PS}>{f.description}</div>}
+            </div>
+          </button>
+        ))}
+        {!loading && folders.length === 0 && <div className="col-span-2 text-center py-8 text-sm" style={PS}>Папок пока нет</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Редактор прайс-листа ──
+function AdminPricelistEditor() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: "", category: "", price: "", duration: "", description: "", photo_url: "" });
+  const [saving, setSaving] = useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+  const cats = ["Криолиполиз", "Лицо", "Тело", "Волосы", "СПА", "РФ-лифтинг", "Другое"];
+
+  const load = () => adminPost("pricelist_custom").then(d => { setItems(d.items || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const resetForm = () => setForm({ name: "", category: "", price: "", duration: "", description: "", photo_url: "" });
+
+  const save = async () => {
+    if (!form.name || !form.category) return;
+    setSaving(true);
+    if (editing) {
+      await adminPost("pricelist_custom", { action: "update", id: editing.id, ...form });
+      setEditing(null);
+    } else {
+      await adminPost("pricelist_custom", { action: "add", ...form });
+      setAdding(false);
+    }
+    resetForm(); setSaving(false); load();
+  };
+
+  const startEdit = (item: any) => {
+    setForm({ name: item.name, category: item.category, price: item.price || "", duration: item.duration || "", description: item.description || "", photo_url: item.photo_url || "" });
+    setEditing(item); setAdding(false);
+  };
+
+  const toggle = async (id: number) => { await adminPost("pricelist_custom", { action: "toggle", id }); load(); };
+  const remove = async (id: number) => { await adminPost("pricelist_custom", { action: "deactivate", id }); load(); };
+
+  const grouped: Record<string, any[]> = {};
+  items.forEach(it => { if (!grouped[it.category]) grouped[it.category] = []; grouped[it.category].push(it); });
+
+  const FormBlock = () => (
+    <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+      {[{ k: "name", l: "Название услуги", ph: "Криолиполиз 2 зоны" }, { k: "price", l: "Цена", ph: "3 500 ₽" }, { k: "duration", l: "Длительность", ph: "60 мин" }, { k: "photo_url", l: "Фото (URL)", ph: "https://..." }, { k: "description", l: "Описание", ph: "Необязательно" }].map(f => (
+        <div key={f.k}>
+          <label className="text-xs font-medium block mb-1" style={PS}>{f.l}</label>
+          <input value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
+            placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+        </div>
+      ))}
+      {form.photo_url && <img src={form.photo_url} className="w-full h-36 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
+      <div>
+        <label className="text-xs font-medium block mb-1" style={PS}>Категория</label>
+        <div className="flex flex-wrap gap-2">
+          {cats.map(c => (
+            <button key={c} onClick={() => setForm(p => ({ ...p, category: c }))}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium"
+              style={form.category === c ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : editing ? "Сохранить" : "Добавить"}
+        </button>
+        <button onClick={() => { resetForm(); setAdding(false); setEditing(null); }} className="px-4 py-3 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-3" style={PS}>Услуги здесь отображаются клиентам в Прайс-листе</p>
+      {!adding && !editing && (
+        <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+          + Добавить услугу
+        </button>
+      )}
+      {(adding || editing) && <FormBlock />}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      {Object.entries(grouped).map(([cat, catItems]) => (
+        <div key={cat} className="mb-4">
+          <div className="px-3 py-1.5 rounded-xl mb-2 text-xs font-bold tracking-wide" style={{ ...GRAD, color: "white" }}>{cat}</div>
+          <div className="space-y-2">
+            {catItems.map(item => (
+              <div key={item.id} className="card-glow rounded-2xl p-3" style={!item.is_active ? { opacity: 0.5 } : {}}>
+                <div className="flex items-start gap-3">
+                  {item.photo_url && <img src={item.photo_url} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={item.name} onError={e => (e.currentTarget.style.display = "none")} />}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm" style={P}>{item.name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {item.price && <span className="text-xs font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.price}</span>}
+                      {item.duration && <span className="text-xs" style={PS}>{item.duration}</span>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    <button onClick={() => startEdit(item)} className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>✏️</button>
+                    <button onClick={() => toggle(item.id)} className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                      {item.is_active ? "Скрыть" : "Показать"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {!loading && items.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Услуг пока нет — добавьте первую!</div>}
+    </div>
+  );
+}
+
+// ── Рассылка ──
+function AdminBroadcast() {
+  const [message, setMessage] = useState("");
+  const [channels, setChannels] = useState<string[]>(["chat"]);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [tab, setTab] = useState<"send" | "history">("send");
+
+  useEffect(() => {
+    adminPost("broadcast_log" as any).catch(() => {});
+  }, []);
+
+  const toggleChannel = (ch: string) => setChannels(prev => prev.includes(ch) ? prev.filter(x => x !== ch) : [...prev, ch]);
+
+  const send = async () => {
+    if (!message.trim() || channels.length === 0) return;
+    setSending(true); setResult(null);
+    const data = await adminPost("broadcast", { message, channels });
+    setResult(data); setSending(false);
+    setMessage("");
+  };
+
+  const channelList = [
+    { id: "chat", label: "Чат на сайте", emoji: "💬", desc: "Всем кто писал в чат" },
+    { id: "sms", label: "SMS", emoji: "📱", desc: "На телефоны всех клиентов" },
+  ];
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="flex rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
+        <button onClick={() => setTab("send")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
+          style={tab === "send" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>Отправить</button>
+        <button onClick={() => setTab("history")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
+          style={tab === "history" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>История</button>
+      </div>
+
+      {tab === "send" && (
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium block mb-2" style={PS}>Каналы рассылки</label>
+            <div className="space-y-2">
+              {channelList.map(ch => (
+                <button key={ch.id} onClick={() => toggleChannel(ch.id)}
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all"
+                  style={channels.includes(ch.id)
+                    ? { background: "hsl(335 80% 60% / 0.1)", border: "1.5px solid hsl(335 80% 70%)" }
+                    : { background: "white", border: "1.5px solid hsl(335 30% 90%)" }}>
+                  <span className="text-2xl">{ch.emoji}</span>
+                  <div>
+                    <div className="font-semibold text-sm" style={P}>{ch.label}</div>
+                    <div className="text-xs" style={PS}>{ch.desc}</div>
+                  </div>
+                  <div className="ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                    style={channels.includes(ch.id) ? { ...GRAD, borderColor: "transparent" } : { borderColor: "hsl(335 30% 80%)" }}>
+                    {channels.includes(ch.id) && <Icon name="Check" size={10} className="text-white" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Текст сообщения</label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
+              placeholder="Напишите сообщение для клиентов..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
+              style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+            <div className="text-xs mt-1 text-right" style={PS}>{message.length} символов</div>
+          </div>
+
+          {result && (
+            <div className="p-3 rounded-xl text-sm font-medium text-center"
+              style={{ background: result.ok ? "hsl(142 60% 94%)" : "hsl(0 60% 95%)", color: result.ok ? "hsl(142 60% 35%)" : "hsl(0 60% 50%)" }}>
+              {result.ok ? `✓ Отправлено ${result.sent || 0} получателям` : "Ошибка отправки"}
+            </div>
+          )}
+
+          <button onClick={send} disabled={sending || !message.trim() || channels.length === 0}
+            className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg"
+            style={message.trim() && channels.length > 0 ? GRAD : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+            {sending ? "Отправляем..." : `🚀 Отправить рассылку (${channels.length} канал${channels.length > 1 ? "а" : ""})`}
+          </button>
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div className="text-center py-10 text-sm" style={PS}>
+          <div className="text-3xl mb-3">📋</div>
+          История рассылок сохраняется в базе данных
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Публичная галерея для клиентов ──
+function ClientGalleryPage({ setPage }: { setPage: (p: Page) => void }) {
+  const [folders, setFolders] = useState<any[]>([]);
+  const [activeFolder, setActiveFolder] = useState<any | null>(null);
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [fullscreen, setFullscreen] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminPost("gallery_folders").then(d => { setFolders(d.folders || []); setLoading(false); });
+  }, []);
+
+  const openFolder = (f: any) => {
+    setActiveFolder(f); setPhotosLoading(true);
+    adminPost("gallery", { folder_id: f.id }).then(d => { setPhotos(d.gallery || []); setPhotosLoading(false); });
+  };
+
+  if (fullscreen) return (
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setFullscreen(null)}>
+      <img src={fullscreen} className="max-w-full max-h-full object-contain" alt="фото" />
+      <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-xl">✕</button>
+    </div>
+  );
+
+  return (
+    <div className="animate-fade-in">
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3">
+        {activeFolder ? (
+          <button onClick={() => { setActiveFolder(null); setPhotos([]); }} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+            <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+          </button>
+        ) : (
+          <button onClick={() => setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+            <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+          </button>
+        )}
+        <div>
+          <h1 className="text-xl font-oswald font-bold" style={P}>{activeFolder ? activeFolder.name : "Галерея 🖼"}</h1>
+          {activeFolder?.description && <p className="text-xs" style={PS}>{activeFolder.description}</p>}
+        </div>
+      </div>
+
+      {!activeFolder && (
+        <div className="px-4 pb-6">
+          {loading && <div className="text-center py-12"><div className="text-3xl animate-float">🌸</div></div>}
+          {!loading && folders.length === 0 && (
+            <div className="text-center py-16">
+              <div className="text-5xl mb-4">🌸</div>
+              <p className="text-sm" style={PS}>Галерея скоро будет пополнена</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {folders.map(f => (
+              <button key={f.id} onClick={() => openFolder(f)} className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
+                {f.cover_url
+                  ? <img src={f.cover_url} className="w-full h-32 object-cover" alt={f.name} />
+                  : <div className="w-full h-32 flex items-center justify-center text-4xl" style={{ background: "hsl(335 80% 96%)" }}>🌸</div>}
+                <div className="p-3">
+                  <div className="font-semibold text-sm" style={P}>{f.name}</div>
+                  {f.description && <div className="text-xs mt-0.5 truncate" style={PS}>{f.description}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeFolder && (
+        <div className="px-4 pb-6">
+          {photosLoading && <div className="text-center py-12"><div className="text-3xl animate-float">🌸</div></div>}
+          {!photosLoading && photos.length === 0 && (
+            <div className="text-center py-16">
+              <div className="text-5xl mb-4">📷</div>
+              <p className="text-sm" style={PS}>В этой папке пока нет фото</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            {photos.map(ph => (
+              <button key={ph.id} onClick={() => setFullscreen(ph.url)} className="rounded-2xl overflow-hidden hover:scale-[1.02] transition-all">
+                <img src={ph.url} alt={ph.title} className="w-full h-36 object-cover" />
+                {ph.title && <div className="px-2 py-1.5 text-xs text-left" style={{ background: "hsl(335 80% 98%)", ...P }}>{ph.title}</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2174,7 +2645,7 @@ function AdminSettings() {
 function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
-    { id: "pricelist", icon: "ClipboardList", label: "Прайс" },
+    { id: "gallery", icon: "Images", label: "Галерея" },
     { id: "booking", icon: "CalendarPlus", label: "Записаться" },
     { id: "chat", icon: "MessageCircle", label: "Чат" },
     { id: "profile", icon: "User", label: "Профиль" },
