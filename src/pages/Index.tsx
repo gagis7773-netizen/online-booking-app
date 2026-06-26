@@ -9,7 +9,7 @@ import ReviewsPage from "./ReviewsPage";
 const HERO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/4ca5a6ce-1c3c-4f87-8e7b-310455a10051.jpg";
 const MASTER_IMG1 = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/e395c63f-3160-4bb4-8eb0-3f30851c376c.jpg";
 const TEAM_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/04d60e29-907d-4125-ad17-d755f9dc780a.jpg";
-const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/91d2850b-d07b-4736-9ab4-23d3cca534fa.png";
+const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/14d6f8e1-0772-4340-a687-4fe03df40989.png";
 const QR_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
 
 type Page = "home" | "services" | "masters" | "booking" | "profile" | "chat" | "promotions" | "gallery" | "reviews";
@@ -152,8 +152,7 @@ export default function Index() {
 }
 
 function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; startBooking: (s: typeof services[0]) => void }) {
-  const CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/4ca5a6ce-1c3c-4f87-8e7b-310455a10051.jpg";
-  const MASTER_CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/2c7a77fe-1082-4a71-841a-064e78bf562c.jpg";
+  const CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/4406ad08-c119-48bc-967f-fbf36d2d1bf0.jpg";
 
   return (
     <div className="animate-fade-in">
@@ -172,6 +171,8 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
             </div>
           ))}
         </div>
+
+        {/* Лого + адрес */}
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
           <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg"
             style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)" }}>
@@ -183,31 +184,28 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
             <span>м. Парнас</span>
           </div>
         </div>
+
+        {/* Заголовок + кнопка */}
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-xs font-medium"
             style={{ background: "hsl(335 80% 60% / 0.15)", border: "1px solid hsl(335 80% 60% / 0.3)", color: "hsl(335 80% 45%)" }}>
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             Свободные окна сегодня
           </div>
-          <h1 className="text-4xl font-oswald font-bold leading-tight mb-2" style={{ color: "hsl(335 60% 30%)" }}>
+          <h1 className="text-4xl font-oswald font-bold leading-tight mb-3" style={{ color: "hsl(335 60% 30%)" }}>
             Запишись<br /><span className="gradient-text">в один клик</span>
           </h1>
-          <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Лучшие мастера · Удобное время · Без звонков</p>
-        </div>
-      </div>
-
-      {/* Master photo banner */}
-      <div className="px-4 mb-6 -mt-2">
-        <div className="card-glow rounded-3xl overflow-hidden relative">
-          <img src={MASTER_CRYO_IMG} alt="Мастер за работой" className="w-full h-56 object-cover" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(255,240,245,0.9) 0%, transparent 50%)" }} />
-          <div className="absolute top-3 right-3 text-2xl opacity-60">🌸</div>
-          <div className="absolute top-3 left-3 text-xl opacity-50">✨</div>
+          <button
+            onClick={() => setPage("booking")}
+            className="w-full py-3.5 rounded-2xl font-semibold text-white text-base animate-pulse-glow shadow-lg"
+            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+            🌸 Записаться сейчас
+          </button>
         </div>
       </div>
 
       {/* Popular services */}
-      <div className="px-4 mb-6">
+      <div className="px-4 mt-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Популярные услуги</h2>
           <button onClick={() => setPage("services")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>
@@ -259,13 +257,11 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
         </div>
       </div>
 
-      {/* Quick links */}
+      {/* Quick links — только Отзывы и Чат */}
       <div className="px-4 mb-5">
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Акции", sub: "Скидки и спецпредложения", page: "promotions", emoji: "🎁" },
-            { label: "Галерея", sub: "Результаты до и после", page: "gallery", emoji: "✨" },
             { label: "Отзывы", sub: "Мнения клиентов", page: "reviews", emoji: "⭐" },
             { label: "Написать нам", sub: "Ответим в чате", page: "chat", emoji: "💬" },
           ].map(item => (
@@ -277,16 +273,6 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
             </button>
           ))}
         </div>
-      </div>
-
-      {/* CTA */}
-      <div className="px-4 mb-6">
-        <button
-          onClick={() => setPage("services")}
-          className="w-full py-4 rounded-2xl font-semibold text-white text-lg animate-pulse-glow shadow-lg"
-          style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
-          🌸 Записаться сейчас
-        </button>
       </div>
 
       {/* ВКонтакте */}
@@ -967,8 +953,6 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "services", icon: "Sparkles", label: "Услуги" },
-    { id: "promotions", icon: "Tag", label: "Акции" },
-    { id: "gallery", icon: "Images", label: "Галерея" },
     { id: "reviews", icon: "Star", label: "Отзывы" },
     { id: "chat", icon: "MessageCircle", label: "Чат" },
     { id: "booking", icon: "CalendarPlus", label: "Записаться" },
