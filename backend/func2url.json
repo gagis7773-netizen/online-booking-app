@@ -1,5 +1,5 @@
 {
-  "clients": "https://functions.poehali.dev/8e7601f2-57a9-4e42-982f-91f900c6831c",
+  "admin-api": "https://functions.poehali.dev/6a39495b-54c8-4d05-a0e8-81e258a80299",
   "auth": "https://functions.poehali.dev/888bfad7-6580-4f39-b963-78aca5d4d8c0",
   "content": "https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941",
   "chat-sms": "https://functions.poehali.dev/cadfcb18-918a-427c-a334-5c8c8ace2c06",

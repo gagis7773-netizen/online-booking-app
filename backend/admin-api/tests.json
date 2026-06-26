@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {
+      "name": "Статистика",
+      "method": "POST",
+      "path": "/",
+      "body": {"section": "stats"},
+      "expectedStatus": 200,
+      "expectedBody": {"clients_total": 1},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

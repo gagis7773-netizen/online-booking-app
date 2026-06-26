@@ -11,8 +11,11 @@ const PRICE_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b91
 const GALINA_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/8f8e57f4-caad-4931-8d8a-bea880feb389.jpg";
 
 const AUTH_URL = "https://functions.poehali.dev/888bfad7-6580-4f39-b963-78aca5d4d8c0";
-const CLIENTS_URL = "https://functions.poehali.dev/8e7601f2-57a9-4e42-982f-91f900c6831c";
+const ADMIN_API_URL = "https://functions.poehali.dev/6a39495b-54c8-4d05-a0e8-81e258a80299";
 const SEND_BOOKING_URL = "https://functions.poehali.dev/33731d63-c7a5-4a89-b075-6b0a4282ecfc";
+
+const adminPost = (section: string, extra?: object) =>
+  fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
 
 type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat";
 
@@ -909,16 +912,40 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [tab, setTab] = useState<"upcoming" | "done">("upcoming");
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    // Загружаем историю из localStorage (записи которые делал клиент через форму)
-    // В реальном проекте — запрос к API по client.id
     const stored = JSON.parse(localStorage.getItem("gp_bookings_" + client.id) || "[]");
     setBookings(stored);
     setLoadingHistory(false);
+
+    const handler = (e: any) => { e.preventDefault(); setDeferredPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, [client.id]);
 
   const filtered = bookings.filter((b: any) => b.status === tab);
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: "Girly Paradise", text: "Запишись на косметологические процедуры онлайн!", url: window.location.href });
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      alert("Ссылка скопирована!");
+    }
+  };
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setInstalled(true);
+      setDeferredPrompt(null);
+    } else {
+      alert("Чтобы добавить на экран: нажми «Поделиться» → «На экран Домой» (iOS) или меню браузера → «Установить»");
+    }
+  };
 
   return (
     <div className="animate-fade-in">
@@ -939,7 +966,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
         </div>
 
         {/* Кнопки действий */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <button onClick={() => setPage("booking")}
             className="py-3.5 rounded-2xl font-semibold text-white shadow-md text-sm"
             style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
@@ -949,6 +976,22 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
             className="py-3.5 rounded-2xl font-semibold text-sm"
             style={{ background: "white", color: "hsl(335 70% 45%)", border: "1.5px solid hsl(335 70% 80%)" }}>
             💬 Написать нам
+          </button>
+        </div>
+
+        {/* Кнопки Share / Install */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <button onClick={handleShare}
+            className="py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
+            style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+            <Icon name="Share2" size={15} />
+            Поделиться
+          </button>
+          <button onClick={handleInstall}
+            className="py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
+            style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+            <Icon name="Smartphone" size={15} />
+            {installed ? "Установлено ✓" : "На экран"}
           </button>
         </div>
 
@@ -973,11 +1016,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
         </div>
 
         <div className="space-y-3 pb-4">
-          {loadingHistory && (
-            <div className="text-center py-8">
-              <div className="text-3xl animate-float">🌸</div>
-            </div>
-          )}
+          {loadingHistory && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
           {!loadingHistory && filtered.length === 0 && (
             <div className="text-center py-10">
               <div className="text-4xl mb-3">✨</div>
@@ -1022,78 +1061,561 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   );
 }
 
-// ─── АДМИН: КЛИЕНТСКАЯ БАЗА ─────────────────────────────────────────────────
+// ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
+
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "settings";
+
+const P = { color: "hsl(335 50% 30%)" };
+const PS = { color: "hsl(335 30% 60%)" };
+const GRAD = { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" };
 
 function AdminPage({ onBack }: { onBack: () => void }) {
-  const [clients, setClients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [section, setSection] = useState<AdminSection>("dashboard");
+  const [stats, setStats] = useState<any>(null);
 
-  useState(() => {
-    fetch(CLIENTS_URL)
-      .then(r => r.json())
-      .then(d => { setClients(d.clients || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  });
+  useEffect(() => {
+    adminPost("stats").then(d => setStats(d)).catch(() => {});
+  }, []);
 
-  const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search)
-  );
+  const menuItems: { id: AdminSection; icon: string; label: string; color: string }[] = [
+    { id: "dashboard", icon: "LayoutDashboard", label: "Сводка", color: "from-pink-500 to-rose-500" },
+    { id: "clients", icon: "Users", label: "Клиенты", color: "from-purple-500 to-pink-500" },
+    { id: "schedule", icon: "CalendarDays", label: "Расписание", color: "from-blue-500 to-indigo-500" },
+    { id: "messages", icon: "MessageCircle", label: "Сообщения", color: "from-teal-500 to-cyan-500" },
+    { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500" },
+    { id: "expenses", icon: "Wallet", label: "Расходы", color: "from-red-500 to-orange-500" },
+    { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
+    { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500" },
+  ];
 
   return (
     <div className="animate-fade-in">
-      <div className="px-4 pt-12 pb-4 flex items-center gap-3">
-        <button onClick={onBack} className="w-10 h-10 rounded-full flex items-center justify-center"
+      <div className="px-4 pt-12 pb-3 flex items-center gap-3">
+        <button onClick={section === "dashboard" ? onBack : () => setSection("dashboard")}
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
           <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
         </button>
         <div>
-          <h1 className="text-xl font-oswald font-bold" style={{ color: "hsl(335 60% 30%)" }}>Клиентская база</h1>
-          <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{clients.length} клиентов</p>
+          <h1 className="text-xl font-oswald font-bold" style={P}>
+            {section === "dashboard" ? "Панель управления" : menuItems.find(m => m.id === section)?.label}
+          </h1>
+          <p className="text-xs" style={PS}>Только для владельца</p>
         </div>
+        <div className="ml-auto text-2xl">👑</div>
       </div>
 
-      <div className="px-4 mb-4">
-        <div className="relative">
-          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по имени или телефону..."
-            className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
-            style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
-        </div>
-      </div>
+      {section === "dashboard" && (
+        <div className="px-4 pb-6">
+          {/* Статистика */}
+          {stats && (
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {[
+                { label: "Клиентов", val: stats.clients_total, icon: "Users", color: "from-pink-500 to-rose-500" },
+                { label: "Записей всего", val: stats.bookings_total, icon: "CalendarCheck", color: "from-purple-500 to-pink-500" },
+                { label: "За месяц", val: stats.bookings_month, icon: "TrendingUp", color: "from-blue-500 to-indigo-500" },
+                { label: "Расходы/мес", val: `${stats.expenses_month} ₽`, icon: "Wallet", color: "from-orange-500 to-red-500" },
+              ].map(item => (
+                <div key={item.label} className="card-glow rounded-2xl p-4">
+                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                    <Icon name={item.icon as any} size={16} className="text-white" />
+                  </div>
+                  <div className="text-2xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+                  <div className="text-xs" style={PS}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!stats && <div className="text-center py-6"><div className="text-3xl animate-float">🌸</div></div>}
 
-      <div className="px-4 space-y-2 pb-6">
-        {loading && (
-          <div className="text-center py-12">
-            <div className="text-3xl mb-3 animate-float">🌸</div>
-            <p className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>Загружаем базу...</p>
+          {/* Меню разделов */}
+          <h2 className="text-base font-oswald font-semibold mb-3" style={P}>Разделы</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {menuItems.slice(1).map(item => (
+              <button key={item.id} onClick={() => setSection(item.id)}
+                className="card-glow rounded-2xl p-4 text-left hover:scale-105 transition-all">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3`}>
+                  <Icon name={item.icon as any} size={18} className="text-white" />
+                </div>
+                <div className="font-semibold text-sm" style={P}>{item.label}</div>
+              </button>
+            ))}
           </div>
-        )}
-        {!loading && filtered.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-3xl mb-3">👤</div>
-            <p style={{ color: "hsl(335 30% 65%)" }}>Нет клиентов</p>
-          </div>
-        )}
+        </div>
+      )}
+
+      {section === "clients" && <AdminClients />}
+      {section === "schedule" && <AdminSchedule />}
+      {section === "messages" && <AdminMessages />}
+      {section === "notifications" && <AdminNotifications />}
+      {section === "expenses" && <AdminExpenses />}
+      {section === "gallery" && <AdminGallery />}
+      {section === "settings" && <AdminSettings />}
+    </div>
+  );
+}
+
+// ── Клиенты ──
+function AdminClients() {
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    adminPost("clients").then(d => { setClients(d.clients || []); setLoading(false); });
+  }, []);
+
+  const filtered = clients.filter(c =>
+    c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search)
+  );
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="relative mb-4">
+        <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..."
+          className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+          style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+      </div>
+      <p className="text-xs mb-3" style={PS}>{filtered.length} клиентов</p>
+      {loading && <div className="text-center py-10"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-2">
         {filtered.map((c, i) => (
-          <div key={c.id} className="card-glow rounded-2xl p-4 animate-slide-up" style={{ animationDelay: `${i * 0.04}s` }}>
+          <div key={c.id} className="card-glow rounded-2xl p-4" style={{ animationDelay: `${i * 0.03}s` }}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
-                {c.name[0]?.toUpperCase()}
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={GRAD}>
+                {c.name?.[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate" style={{ color: "hsl(335 50% 30%)" }}>{c.name}</div>
+                <div className="font-semibold truncate text-sm" style={P}>{c.name}</div>
                 <a href={`tel:${c.phone}`} className="text-sm" style={{ color: "hsl(335 80% 55%)" }}>{c.phone}</a>
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="text-xs font-medium" style={{ color: "hsl(335 50% 40%)" }}>{c.bookings_count} зап.</div>
-                <div className="text-xs" style={{ color: "hsl(335 20% 65%)" }}>с {c.registered_at}</div>
+                <div className="text-xs" style={PS}>с {c.registered_at}</div>
               </div>
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Расписание ──
+function AdminSchedule() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "" });
+  const [saving, setSaving] = useState(false);
+
+  const load = () => adminPost("schedule").then(d => { setItems(d.schedule || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.client_name || !form.booking_date || !form.booking_time) return;
+    setSaving(true);
+    await adminPost("schedule", { action: "add", ...form });
+    setForm({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "" });
+    setAdding(false);
+    setSaving(false);
+    load();
+  };
+
+  const del = async (id: number) => {
+    await adminPost("schedule", { action: "delete", id });
+    load();
+  };
+
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  return (
+    <div className="px-4 pb-6">
+      <button onClick={() => setAdding(!adding)}
+        className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm"
+        style={GRAD}>
+        {adding ? "✕ Отмена" : "+ Добавить запись"}
+      </button>
+
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          {[
+            { key: "client_name", label: "Имя клиента", ph: "Имя" },
+            { key: "client_phone", label: "Телефон", ph: "+7..." },
+            { key: "services", label: "Услуги", ph: "Криолиполиз, СМАС..." },
+            { key: "booking_date", label: "Дата", ph: "2026-07-15" },
+            { key: "booking_time", label: "Время", ph: "14:00" },
+            { key: "notes", label: "Примечание", ph: "Необязательно" },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+              <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            </div>
+          ))}
+          <button onClick={save} disabled={saving}
+            className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "Сохранить"}
+          </button>
+        </div>
+      )}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div key={item.id} className="card-glow rounded-2xl p-4">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
+                <div className="text-xs" style={PS}>{item.services}</div>
+              </div>
+              <button onClick={() => del(item.id)} className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+            </div>
+            <div className="flex items-center gap-3 text-xs" style={PS}>
+              <span>📅 {item.booking_date}</span>
+              <span>🕐 {item.booking_time}</span>
+              <span>👩 {item.master}</span>
+            </div>
+            {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs mt-1 block" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
+          </div>
+        ))}
+        {!loading && items.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Расписание пусто</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Сообщения ──
+function AdminMessages() {
+  const [chats, setChats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    adminPost("messages").then(d => { setChats(d.chats || []); setLoading(false); });
+  }, []);
+
+  return (
+    <div className="px-4 pb-6">
+      {loading && <div className="text-center py-10"><div className="text-3xl animate-float">🌸</div></div>}
+      {!loading && chats.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Сообщений пока нет</div>}
+      <div className="space-y-2">
+        {chats.map(c => (
+          <div key={c.id} className="card-glow rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={GRAD}>
+                {c.client_name?.[0]?.toUpperCase() || "?"}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-sm" style={P}>{c.client_name}</div>
+                <div className="text-xs" style={PS}>{c.client_phone} · {c.msg_count} сообщ.</div>
+              </div>
+              <div className="text-xs" style={PS}>{c.last_msg?.slice(0, 10)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Уведомления / SMS ──
+function AdminNotifications() {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [phone, setPhone] = useState("");
+  const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sentAll, setSentAll] = useState(false);
+  const [tab, setTab] = useState<"send" | "history">("send");
+
+  const load = () => adminPost("notifications").then(d => { setHistory(d.notifications || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const sendOne = async () => {
+    if (!phone || !msg) return;
+    setSending(true);
+    await adminPost("notifications", { action: "send", phone, message: msg });
+    setPhone(""); setMsg(""); setSending(false); load();
+  };
+
+  const sendAll = async () => {
+    if (!msg || !confirm("Отправить SMS всем клиентам?")) return;
+    setSending(true);
+    await adminPost("notifications", { action: "send_all", message: msg });
+    setMsg(""); setSending(false); setSentAll(true); load();
+    setTimeout(() => setSentAll(false), 3000);
+  };
+
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="flex rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
+        <button onClick={() => setTab("send")} className="flex-1 py-2.5 text-sm font-medium transition-all"
+          style={tab === "send" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>Отправить</button>
+        <button onClick={() => setTab("history")} className="flex-1 py-2.5 text-sm font-medium transition-all"
+          style={tab === "history" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>История</button>
+      </div>
+
+      {tab === "send" && (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Телефон клиента (или оставь пустым для всех)</label>
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Текст SMS</label>
+            <textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="Текст сообщения..." rows={3}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={sendOne} disabled={sending || !phone || !msg}
+              className="py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              Отправить одному
+            </button>
+            <button onClick={sendAll} disabled={sending || !msg}
+              className="py-3 rounded-xl font-semibold text-sm"
+              style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px solid hsl(335 60% 80%)" }}>
+              {sentAll ? "Отправлено ✓" : sending ? "..." : "Всем клиентам"}
+            </button>
+          </div>
+          <p className="text-xs text-center" style={PS}>SMS отправляются через SMS.ru</p>
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div className="space-y-2">
+          {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+          {!loading && history.length === 0 && <div className="text-center py-8 text-sm" style={PS}>История пуста</div>}
+          {history.map(n => (
+            <div key={n.id} className="card-glow rounded-xl p-3">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-medium" style={P}>{n.client_name || n.client_phone}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full"
+                  style={n.status === "sent" ? { background: "hsl(142 60% 92%)", color: "hsl(142 60% 35%)" } : { background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>
+                  {n.status === "sent" ? "✓ Доставлено" : "✕ Ошибка"}
+                </span>
+              </div>
+              <p className="text-xs" style={PS}>{n.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Расходы ──
+function AdminExpenses() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totals, setTotals] = useState({ total: 0, month: 0 });
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title: "", amount: "", category: "Расходники", expense_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [saving, setSaving] = useState(false);
+
+  const cats = ["Расходники", "Аренда", "Оборудование", "Реклама", "Зарплата", "Прочее"];
+
+  const load = () => adminPost("expenses").then(d => {
+    setItems(d.expenses || []); setTotals({ total: d.total || 0, month: d.month || 0 }); setLoading(false);
+  });
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.title || !form.amount) return;
+    setSaving(true);
+    await adminPost("expenses", { action: "add", ...form, amount: parseFloat(form.amount) });
+    setForm({ title: "", amount: "", category: "Расходники", expense_date: new Date().toISOString().slice(0, 10), notes: "" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const del = async (id: number) => {
+    await adminPost("expenses", { action: "delete", id }); load();
+  };
+
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="card-glow rounded-2xl p-4">
+          <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{totals.month.toLocaleString()} ₽</div>
+          <div className="text-xs" style={PS}>Расходы в этом месяце</div>
+        </div>
+        <div className="card-glow rounded-2xl p-4">
+          <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{totals.total.toLocaleString()} ₽</div>
+          <div className="text-xs" style={PS}>Всего за всё время</div>
+        </div>
+      </div>
+
+      <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {adding ? "✕ Отмена" : "+ Добавить расход"}
+      </button>
+
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          {[
+            { key: "title", label: "Название", ph: "Косметика, аренда..." },
+            { key: "amount", label: "Сумма, ₽", ph: "5000" },
+            { key: "expense_date", label: "Дата", ph: "2026-06-27" },
+            { key: "notes", label: "Примечание", ph: "Необязательно" },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
+              <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            </div>
+          ))}
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Категория</label>
+            <div className="flex flex-wrap gap-2">
+              {cats.map(c => (
+                <button key={c} onClick={() => setForm(p => ({ ...p, category: c }))}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
+                  style={form.category === c ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "Сохранить"}
+          </button>
+        </div>
+      )}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-2">
+        {items.map(item => (
+          <div key={item.id} className="card-glow rounded-2xl p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="font-semibold text-sm" style={P}>{item.title}</div>
+                <div className="text-xs" style={PS}>{item.category} · {item.expense_date}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold font-oswald" style={{ color: "hsl(335 80% 55%)" }}>{Number(item.amount).toLocaleString()} ₽</span>
+                <button onClick={() => del(item.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!loading && items.length === 0 && <div className="text-center py-8 text-sm" style={PS}>Расходов нет</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Галерея ──
+function AdminGallery() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title: "", url: "", category: "До и после" });
+  const [saving, setSaving] = useState(false);
+
+  const load = () => adminPost("gallery").then(d => { setItems(d.gallery || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.url) return;
+    setSaving(true);
+    await adminPost("gallery", { action: "add", ...form });
+    setForm({ title: "", url: "", category: "До и после" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const del = async (id: number) => {
+    await adminPost("gallery", { action: "delete", id }); load();
+  };
+
+  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  return (
+    <div className="px-4 pb-6">
+      <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+        {adding ? "✕ Отмена" : "+ Добавить фото"}
+      </button>
+
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Ссылка на фото (URL)</label>
+            <input value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Название</label>
+            <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Необязательно"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+          </div>
+          {form.url && <img src={form.url} className="w-full h-40 object-cover rounded-xl" alt="preview" />}
+          <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "Добавить"}
+          </button>
+        </div>
+      )}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="grid grid-cols-2 gap-3">
+        {items.map(item => (
+          <div key={item.id} className="card-glow rounded-2xl overflow-hidden relative">
+            <img src={item.url} alt={item.title} className="w-full h-36 object-cover" />
+            <div className="p-2">
+              <div className="text-xs font-medium truncate" style={P}>{item.title || item.category}</div>
+            </div>
+            <button onClick={() => del(item.id)}
+              className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+              style={{ background: "rgba(255,255,255,0.9)", color: "hsl(0 60% 55%)" }}>✕</button>
+          </div>
+        ))}
+        {!loading && items.length === 0 && <div className="col-span-2 text-center py-8 text-sm" style={PS}>Галерея пуста</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Настройки ──
+function AdminSettings() {
+  const SITE_URL = window.location.href;
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard.writeText(SITE_URL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="px-4 pb-6 space-y-4">
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold mb-1 text-sm" style={P}>Ссылка на сайт</div>
+        <div className="text-xs mb-3 break-all" style={PS}>{SITE_URL}</div>
+        <button onClick={copy} className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {copied ? "Скопировано ✓" : "Скопировать ссылку"}
+        </button>
+      </div>
+
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold mb-1 text-sm" style={P}>Контакты салона</div>
+        <div className="space-y-1 text-xs" style={PS}>
+          <div>📞 +7 (904) 601-55-56</div>
+          <div>📍 ул. Заречная, 10, м. Парнас</div>
+          <div>🕐 Ежедневно 11:00–20:00</div>
+          <div>📧 Siplatova777@list.ru</div>
+        </div>
+      </div>
+
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold mb-1 text-sm" style={P}>Доступ в панель</div>
+        <div className="text-xs" style={PS}>Удержи логотип на главной странице 2 секунды — откроется панель владельца</div>
+      </div>
+
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold mb-2 text-sm" style={P}>Уведомления на почту</div>
+        <div className="text-xs" style={PS}>При каждой новой записи клиента на процедуру автоматически приходит письмо на <span style={{ color: "hsl(335 80% 55%)" }}>Siplatova777@list.ru</span></div>
       </div>
     </div>
   );

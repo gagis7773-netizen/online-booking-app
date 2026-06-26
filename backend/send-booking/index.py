@@ -1,9 +1,12 @@
 import json
 import os
 import smtplib
-# v3
+import psycopg2
+# v4
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+SCHEMA = "t_p3248579_online_booking_app"
 
 
 def send_email(server, smtp_user, to_email, subject, html_body):
@@ -101,6 +104,24 @@ def handler(event: dict, context) -> dict:
         </div>
     </div>
     """
+
+    # Сохраняем в расписание БД
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        cur = conn.cursor()
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.schedule (client_name, client_phone, services, master, booking_date, booking_time, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 'confirmed')
+        """, (name, phone, service, master, day, time))
+        # Также в bookings
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.bookings (client_name, client_phone, client_email, service, master, booking_date, booking_time, price, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'new')
+        """, (name, phone, client_email, service, master, day, time, price if price else 0))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
     with smtplib.SMTP_SSL("smtp.mail.ru", 465) as server:
         server.login(smtp_user, smtp_password)

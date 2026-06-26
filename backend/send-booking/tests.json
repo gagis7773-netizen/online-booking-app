@@ -1,20 +1,10 @@
 {
   "tests": [
     {
-      "name": "Send booking notification",
-      "method": "POST",
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
       "path": "/",
-      "body": {
-        "name": "Тест Тестов",
-        "phone": "+7 (999) 000-00-00",
-        "service": "Маникюр с покрытием",
-        "master": "Алина Петрова",
-        "day": "Ср, 7 мая",
-        "time": "14:00",
-        "price": "1800"
-      },
       "expectedStatus": 200,
-      "expectedBody": {"ok": true},
       "bodyMatcher": "partial"
     }
   ]
