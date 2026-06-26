@@ -6,12 +6,11 @@ import PromotionsPage from "./PromotionsPage";
 import GalleryPage from "./GalleryPage";
 import ReviewsPage from "./ReviewsPage";
 
-const HERO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/ed133e4a-8075-48f3-aef7-aac349c92305.jpg";
+const HERO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/4ca5a6ce-1c3c-4f87-8e7b-310455a10051.jpg";
 const MASTER_IMG1 = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/e395c63f-3160-4bb4-8eb0-3f30851c376c.jpg";
 const TEAM_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/04d60e29-907d-4125-ad17-d755f9dc780a.jpg";
-const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
-const MY_PHOTO = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/fb416e4c-4230-4b80-be79-a4c0d47a1161.png";
-const QR_CODE = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
+const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/91d2850b-d07b-4736-9ab4-23d3cca534fa.png";
+const QR_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
 
 type Page = "home" | "services" | "masters" | "booking" | "profile" | "chat" | "promotions" | "gallery" | "reviews";
 
@@ -153,125 +152,67 @@ export default function Index() {
 }
 
 function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; startBooking: (s: typeof services[0]) => void }) {
-  const GLITTERS = ["✦","✧","★","✦","🌟","✧","⭐","✦","✧","★"];
-  const BUTTERFLIES = ["🦋","🦋","🦋"];
-  const FLOWERS_LEFT = ["🌸","🌺","🌼","🌷","🪷","🌹","💐","🌸","🌺","🌼","🌷","🪷"];
-  const FLOWERS_RIGHT = ["🌹","🌷","🌸","💐","🪷","🌺","🌼","🌸","🌷","🌹","🌺","🪷"];
+  const CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/4ca5a6ce-1c3c-4f87-8e7b-310455a10051.jpg";
+  const MASTER_CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/2c7a77fe-1082-4a71-841a-064e78bf562c.jpg";
 
   return (
-    <div className="animate-fade-in relative">
-
-      {/* === БОКОВЫЕ ЦВЕТЫ === */}
-      <div className="fixed left-0 top-0 bottom-0 w-8 z-10 pointer-events-none flex flex-col justify-around" style={{ paddingTop: 60, paddingBottom: 80 }}>
-        {FLOWERS_LEFT.map((f, i) => (
-          <div key={i} className="animate-float text-center" style={{ fontSize: 14 + (i % 3) * 4, animationDelay: `${i * 0.4}s`, opacity: 0.75 }}>{f}</div>
-        ))}
-      </div>
-      <div className="fixed right-0 top-0 bottom-0 w-8 z-10 pointer-events-none flex flex-col justify-around" style={{ paddingTop: 60, paddingBottom: 80 }}>
-        {FLOWERS_RIGHT.map((f, i) => (
-          <div key={i} className="animate-float text-center" style={{ fontSize: 14 + (i % 3) * 4, animationDelay: `${i * 0.5}s`, opacity: 0.75 }}>{f}</div>
-        ))}
-      </div>
-
-      {/* === ЛЕТЯЩИЕ БЛЁСТКИ, ЗВЁЗДЫ, БАБОЧКИ === */}
-      <div className="fixed inset-0 pointer-events-none z-20 overflow-hidden">
-        {GLITTERS.map((g, i) => (
-          <div key={`g${i}`} className="absolute animate-glitter"
-            style={{
-              left: `${8 + i * 9}%`,
-              top: `${Math.random() * 70 + 5}%`,
-              fontSize: 10 + (i % 4) * 5,
-              color: i % 3 === 0 ? "#ffd700" : i % 3 === 1 ? "#ffb6c1" : "#fff",
-              animationDelay: `${i * 0.6}s`,
-              animationDuration: `${3 + (i % 3)}s`,
-              opacity: 0.85,
-            }}>
-            {g}
-          </div>
-        ))}
-        {BUTTERFLIES.map((b, i) => (
-          <div key={`b${i}`} className="absolute animate-butterfly"
-            style={{ left: `${10 + i * 35}%`, top: `${15 + i * 20}%`, fontSize: 22, animationDelay: `${i * 2}s`, opacity: 0.7 }}>
-            {b}
-          </div>
-        ))}
-      </div>
-
-      {/* === HERO === */}
-      <div className="relative overflow-hidden" style={{ minHeight: 520 }}>
-        <img src={HERO_IMG} alt="Girly Paradise" className="w-full object-cover" style={{ height: 520, objectPosition: "center top" }} />
+    <div className="animate-fade-in">
+      {/* Hero */}
+      <div className="relative h-[480px] overflow-hidden">
+        <img src={CRYO_IMG} alt="Girly Paradise" className="w-full h-full object-cover" />
         <div className="absolute inset-0" style={{
-          background: "linear-gradient(to bottom, rgba(255,220,230,0.15) 0%, rgba(255,182,193,0.2) 40%, rgba(255,240,245,0.97) 100%)"
+          background: "linear-gradient(to bottom, rgba(255,220,230,0.2) 0%, rgba(255,182,193,0.3) 40%, rgba(255,240,245,0.95) 100%)"
         }} />
-
-        {/* ЛОГО В ЦЕНТРЕ СВЕРХУ */}
-        <div className="absolute top-3 left-0 right-0 flex flex-col items-center gap-1 z-10">
-          <div className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center shadow-xl"
-            style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "blur(10px)" }}>
+        {/* Sparkles overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          {["✦","✧","✦","✧","✦","✧"].map((s, i) => (
+            <div key={i} className="absolute text-pink-300 animate-float"
+              style={{ left: `${5 + i * 17}%`, top: `${10 + (i % 3) * 20}%`, fontSize: 14 + (i % 3) * 6, opacity: 0.6, animationDelay: `${i * 0.6}s` }}>
+              {s}
+            </div>
+          ))}
+        </div>
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg"
+            style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)" }}>
             <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
           </div>
-          <div className="text-center">
-            <div className="font-oswald font-bold tracking-widest text-sm" style={{ color: "#2d1015", letterSpacing: 3 }}>GIRLY PARADISE</div>
-            <div className="text-xs tracking-widest" style={{ color: "hsl(335 40% 55%)", letterSpacing: 2 }}>BEAUTY STUDIO</div>
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 80% 55%)", border: "1px solid hsl(335 80% 80%)" }}>
+            <Icon name="MapPin" size={12} />
+            <span>м. Парнас</span>
           </div>
         </div>
-
-        {/* М. ПАРНАС — золотой стиль */}
-        <div className="absolute top-4 right-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
-            style={{
-              background: "linear-gradient(135deg, #b8860b, #ffd700, #f0c040)",
-              color: "#2d1015",
-              border: "1px solid #ffd700",
-              boxShadow: "0 2px 12px rgba(255,215,0,0.5)",
-            }}>
-            <Icon name="MapPin" size={11} />
-            <span style={{ letterSpacing: 1 }}>м. Парнас</span>
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pt-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-2 text-xs font-medium"
+        <div className="absolute bottom-0 left-0 right-0 p-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-xs font-medium"
             style={{ background: "hsl(335 80% 60% / 0.15)", border: "1px solid hsl(335 80% 60% / 0.3)", color: "hsl(335 80% 45%)" }}>
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             Свободные окна сегодня
           </div>
-          {/* ЗОЛОТОЙ ОБЪЁМНЫЙ ТЕКСТ */}
-          <h1 className="font-oswald font-bold leading-tight mb-1" style={{
-            fontSize: 36,
-            background: "linear-gradient(180deg, #fff5cc 0%, #ffd700 30%, #b8860b 60%, #ffd700 80%, #ffe066 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-            filter: "drop-shadow(0 2px 6px rgba(184,134,11,0.7)) drop-shadow(0 0 12px rgba(255,215,0,0.5))",
-            textShadow: "none",
-          }}>
-            Запишись<br />в один клик ✨
+          <h1 className="text-4xl font-oswald font-bold leading-tight mb-2" style={{ color: "hsl(335 60% 30%)" }}>
+            Запишись<br /><span className="gradient-text">в один клик</span>
           </h1>
-          <p className="text-sm" style={{ color: "hsl(335 30% 45%)" }}>Лучшие мастера · Удобное время · Без звонков</p>
+          <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Лучшие мастера · Удобное время · Без звонков</p>
         </div>
       </div>
 
-      {/* === ЗАПИСАТЬСЯ СЕЙЧАС — перед услугами === */}
-      <div className="px-4 mt-4 mb-5">
-        <button
-          onClick={() => setPage("booking")}
-          className="w-full py-4 rounded-2xl font-bold text-lg shadow-xl"
-          style={{
-            background: "linear-gradient(135deg, #b8860b, #ffd700, #f0c040, #ffd700, #b8860b)",
-            color: "#2d1015",
-            boxShadow: "0 4px 24px rgba(255,215,0,0.45), 0 2px 8px rgba(184,134,11,0.3)",
-            letterSpacing: 1,
-          }}>
-          🌸 Записаться сейчас
-        </button>
+      {/* Master photo banner */}
+      <div className="px-4 mb-6 -mt-2">
+        <div className="card-glow rounded-3xl overflow-hidden relative">
+          <img src={MASTER_CRYO_IMG} alt="Мастер за работой" className="w-full h-56 object-cover" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(255,240,245,0.9) 0%, transparent 50%)" }} />
+          <div className="absolute top-3 right-3 text-2xl opacity-60">🌸</div>
+          <div className="absolute top-3 left-3 text-xl opacity-50">✨</div>
+        </div>
       </div>
 
-      {/* === ПОПУЛЯРНЫЕ УСЛУГИ === */}
-      <div className="px-4 mb-5">
-        <div className="flex items-center justify-between mb-3">
+      {/* Popular services */}
+      <div className="px-4 mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Популярные услуги</h2>
-          <button onClick={() => setPage("services")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>Все →</button>
+          <button onClick={() => setPage("services")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>
+            Все →
+          </button>
         </div>
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
           {services.slice(0, 5).map((s, i) => (
@@ -283,31 +224,19 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
                 <Icon name={s.icon as any} size={18} className="text-white" />
               </div>
               <div className="text-sm font-medium leading-tight mb-2" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
-              <div className="text-xs font-medium" style={{ color: "hsl(335 80% 55%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить"}</div>
+              <div className="text-xs font-medium" style={{ color: "hsl(335 80% 55%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить цену"}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* === МОЁ ФОТО === */}
-      <div className="px-4 mb-5">
-        <div className="card-glow rounded-3xl overflow-hidden relative">
-          <img src={MY_PHOTO} alt="Галина Сиплатова" className="w-full object-cover" style={{ height: 320, objectPosition: "center top" }} />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(255,240,245,0.92) 0%, transparent 55%)" }} />
-          <div className="absolute top-3 right-3 text-2xl opacity-70 animate-float">🌸</div>
-          <div className="absolute top-3 left-3 animate-star" style={{ fontSize: 20, color: "#ffd700" }}>★</div>
-          <div className="absolute bottom-0 left-0 right-0 p-4 text-center">
-            <div className="font-oswald font-bold text-lg" style={{ color: "hsl(335 60% 25%)" }}>Галина Сиплатова</div>
-            <div className="text-xs" style={{ color: "hsl(335 40% 55%)" }}>Косметолог-эстетист · Криолиполиз · СМАС-лифтинг</div>
-          </div>
-        </div>
-      </div>
-
-      {/* === НАШИ МАСТЕРА === */}
-      <div className="px-4 mb-5">
-        <div className="flex items-center justify-between mb-3">
+      {/* Masters */}
+      <div className="px-4 mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Наши мастера</h2>
-          <button onClick={() => setPage("masters")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>Все →</button>
+          <button onClick={() => setPage("masters")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>
+            Все →
+          </button>
         </div>
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
           {masters.map((m) => (
@@ -330,7 +259,7 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
         </div>
       </div>
 
-      {/* === РАЗДЕЛЫ === */}
+      {/* Quick links */}
       <div className="px-4 mb-5">
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -350,26 +279,35 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
         </div>
       </div>
 
-      {/* === QR-КОД группы === */}
+      {/* CTA */}
+      <div className="px-4 mb-6">
+        <button
+          onClick={() => setPage("services")}
+          className="w-full py-4 rounded-2xl font-semibold text-white text-lg animate-pulse-glow shadow-lg"
+          style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+          🌸 Записаться сейчас
+        </button>
+      </div>
+
+      {/* ВКонтакте */}
       <div className="px-4 mb-5">
         <div className="card-glow rounded-3xl p-5 text-center">
-          <div className="font-oswald font-bold text-lg mb-1" style={{ color: "hsl(335 60% 30%)" }}>Наша группа ВКонтакте</div>
-          <div className="text-xs mb-3" style={{ color: "hsl(335 30% 55%)" }}>Сканируй QR-код или переходи по ссылке</div>
+          <div className="font-oswald font-bold text-lg mb-1" style={{ color: "hsl(335 60% 30%)" }}>Мы ВКонтакте</div>
+          <div className="text-xs mb-3" style={{ color: "hsl(335 30% 55%)" }}>Акции, новости и запись онлайн</div>
           <div className="flex justify-center mb-3">
-            <div className="w-44 h-44 rounded-2xl overflow-hidden shadow-md border-4" style={{ borderColor: "hsl(335 50% 88%)" }}>
-              <img src="https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png"
-                alt="QR-код группы" className="w-full h-full object-cover" />
+            <div className="w-44 h-44 rounded-2xl overflow-hidden shadow-md border-2" style={{ borderColor: "hsl(335 50% 88%)" }}>
+              <img src={QR_IMG} alt="QR-код группы ВКонтакте" className="w-full h-full object-cover" />
             </div>
           </div>
           <a href="https://vk.com/id903571459" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white text-sm shadow-md"
             style={{ background: "linear-gradient(135deg, #4c75a3, #5b8ec2)" }}>
-            Открыть группу ВКонтакте
+            Открыть страницу
           </a>
         </div>
       </div>
 
-      {/* === КОНТАКТЫ === */}
+      {/* Contacts */}
       <div className="px-4 mb-2">
         <div className="card-glow rounded-3xl p-5 space-y-4">
           <div className="flex items-center gap-3 mb-1">
@@ -378,7 +316,7 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
             </div>
             <div>
               <h2 className="text-lg font-oswald font-semibold leading-tight" style={{ color: "hsl(335 60% 30%)" }}>Girly Paradise</h2>
-              <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Beauty Studio ✨</p>
+              <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Beauty Apartments ✨</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
