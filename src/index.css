@@ -4,39 +4,39 @@
 
 @layer base {
   :root {
-    --background: 240 10% 6%;
-    --foreground: 0 0% 98%;
+    --background: 340 40% 97%;
+    --foreground: 340 20% 20%;
 
-    --card: 240 8% 10%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 20% 20%;
 
-    --popover: 240 8% 10%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 20% 20%;
 
-    --primary: 315 100% 60%;
+    --primary: 335 80% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 8% 15%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 340 40% 93%;
+    --secondary-foreground: 340 20% 30%;
 
-    --muted: 240 8% 15%;
-    --muted-foreground: 240 5% 60%;
+    --muted: 340 30% 92%;
+    --muted-foreground: 340 15% 55%;
 
-    --accent: 270 100% 65%;
+    --accent: 315 70% 70%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 8% 18%;
-    --input: 240 8% 15%;
-    --ring: 315 100% 60%;
+    --border: 340 30% 88%;
+    --input: 340 30% 92%;
+    --ring: 335 80% 60%;
 
     --radius: 1rem;
 
-    --neon-pink: 315 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-cyan: 185 100% 55%;
+    --rose-primary: 335 80% 60%;
+    --rose-light: 340 80% 88%;
+    --rose-pale: 340 40% 97%;
   }
 }
 
@@ -48,6 +48,14 @@
   body {
     @apply bg-background text-foreground;
     font-family: "Golos Text", sans-serif;
+    background: linear-gradient(
+      135deg,
+      #fff5f7 0%,
+      #fce4ec 30%,
+      #fdf6f8 60%,
+      #fff0f3 100%
+    );
+    min-height: 100vh;
   }
 
   h1,
@@ -60,42 +68,43 @@
 @layer utilities {
   .glow-pink {
     box-shadow:
-      0 0 20px hsl(315 100% 60% / 0.4),
-      0 0 60px hsl(315 100% 60% / 0.15);
-  }
-  .glow-purple {
-    box-shadow:
-      0 0 20px hsl(270 100% 65% / 0.4),
-      0 0 60px hsl(270 100% 65% / 0.15);
+      0 0 20px hsl(335 80% 60% / 0.3),
+      0 0 60px hsl(335 80% 60% / 0.1);
   }
   .text-glow {
-    text-shadow: 0 0 20px hsl(315 100% 60% / 0.6);
+    text-shadow: 0 0 20px hsl(335 80% 60% / 0.4);
   }
   .gradient-text {
     background: linear-gradient(
       135deg,
-      hsl(315 100% 65%),
-      hsl(270 100% 70%),
-      hsl(185 100% 60%)
+      hsl(335 80% 55%),
+      hsl(315 70% 65%),
+      hsl(350 90% 60%)
     );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .card-glow {
-    background: linear-gradient(135deg, hsl(240 8% 12%), hsl(240 8% 10%));
-    border: 1px solid hsl(240 8% 20%);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid hsl(340 50% 88%);
+    box-shadow:
+      0 4px 24px hsl(335 80% 60% / 0.08),
+      0 1px 4px hsl(335 80% 60% / 0.05);
     transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
   }
   .card-glow:hover {
-    border-color: hsl(315 100% 60% / 0.5);
+    border-color: hsl(335 80% 60% / 0.4);
     box-shadow:
-      0 0 30px hsl(315 100% 60% / 0.1),
-      0 8px 32px rgba(0, 0, 0, 0.4);
+      0 0 30px hsl(335 80% 60% / 0.15),
+      0 8px 32px hsl(335 80% 60% / 0.1);
     transform: translateY(-2px);
   }
-  .noise-bg {
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  .sparkle {
+    position: absolute;
+    pointer-events: none;
+    animation: sparkle-float linear infinite;
   }
   .animate-fade-in {
     animation: fadeIn 0.5s ease forwards;
@@ -138,12 +147,12 @@
   @keyframes pulse-glow {
     0%,
     100% {
-      box-shadow: 0 0 20px hsl(315 100% 60% / 0.4);
+      box-shadow: 0 0 20px hsl(335 80% 60% / 0.3);
     }
     50% {
       box-shadow:
-        0 0 40px hsl(315 100% 60% / 0.7),
-        0 0 80px hsl(270 100% 65% / 0.3);
+        0 0 40px hsl(335 80% 60% / 0.6),
+        0 0 80px hsl(315 70% 65% / 0.2);
     }
   }
   .animate-pulse-glow {
@@ -160,6 +169,16 @@
   }
   .animate-float {
     animation: float 4s ease-in-out infinite;
+  }
+  @keyframes sparkle-float {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-100vh) rotate(720deg);
+      opacity: 0;
+    }
   }
 
   .scrollbar-hide::-webkit-scrollbar {

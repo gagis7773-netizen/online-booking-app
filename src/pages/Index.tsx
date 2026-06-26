@@ -78,15 +78,22 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden" style={{ background: "linear-gradient(135deg, #fff5f7 0%, #fce4ec 30%, #fdf6f8 60%, #fff0f3 100%)" }}>
       {/* Background blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, hsl(315 100% 60%), transparent 70%)" }} />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-8"
-          style={{ background: "radial-gradient(circle, hsl(270 100% 65%), transparent 70%)" }} />
-        <div className="absolute top-[40%] left-[30%] w-[300px] h-[300px] rounded-full opacity-5"
-          style={{ background: "radial-gradient(circle, hsl(185 100% 55%), transparent 70%)" }} />
+        <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, hsl(335 80% 80%), transparent 70%)" }} />
+        <div className="absolute bottom-[-5%] left-[-5%] w-[350px] h-[350px] rounded-full opacity-15"
+          style={{ background: "radial-gradient(circle, hsl(315 70% 85%), transparent 70%)" }} />
+        <div className="absolute top-[50%] left-[20%] w-[200px] h-[200px] rounded-full opacity-10"
+          style={{ background: "radial-gradient(circle, hsl(350 90% 80%), transparent 70%)" }} />
+        {/* Floating sparkles */}
+        {["✦","✧","✦","✧","✦"].map((s, i) => (
+          <div key={i} className="absolute text-pink-300 opacity-40 animate-float"
+            style={{ left: `${10 + i * 20}%`, top: `${20 + (i % 3) * 25}%`, fontSize: 12 + (i % 3) * 6, animationDelay: `${i * 0.8}s` }}>
+            {s}
+          </div>
+        ))}
       </div>
 
       {/* Content */}
@@ -136,43 +143,70 @@ export default function Index() {
 }
 
 function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; startBooking: (s: typeof services[0]) => void }) {
+  const CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/4ca5a6ce-1c3c-4f87-8e7b-310455a10051.jpg";
+  const MASTER_CRYO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/2c7a77fe-1082-4a71-841a-064e78bf562c.jpg";
+
   return (
     <div className="animate-fade-in">
       {/* Hero */}
-      <div className="relative h-[420px] overflow-hidden">
-        <img src={HERO_IMG} alt="hero" className="w-full h-full object-cover" />
+      <div className="relative h-[480px] overflow-hidden">
+        <img src={CRYO_IMG} alt="Girly Paradise" className="w-full h-full object-cover" />
         <div className="absolute inset-0" style={{
-          background: "linear-gradient(to bottom, rgba(15,15,25,0.3) 0%, rgba(15,15,25,0.7) 60%, rgba(15,15,25,1) 100%)"
+          background: "linear-gradient(to bottom, rgba(255,220,230,0.2) 0%, rgba(255,182,193,0.3) 40%, rgba(255,240,245,0.95) 100%)"
         }} />
+        {/* Sparkles overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          {["✦","✧","✦","✧","✦","✧"].map((s, i) => (
+            <div key={i} className="absolute text-pink-300 animate-float"
+              style={{ left: `${5 + i * 17}%`, top: `${10 + (i % 3) * 20}%`, fontSize: 14 + (i % 3) * 6, opacity: 0.6, animationDelay: `${i * 0.6}s` }}>
+              {s}
+            </div>
+          ))}
+        </div>
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(10px)" }}>
+          <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg"
+            style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)" }}>
             <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
           </div>
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white/80 text-xs"
-            style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(8px)" }}>
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 80% 55%)", border: "1px solid hsl(335 80% 80%)" }}>
             <Icon name="MapPin" size={12} />
             <span>м. Парнас</span>
           </div>
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-xs font-medium"
-            style={{ background: "hsl(315 100% 60% / 0.2)", border: "1px solid hsl(315 100% 60% / 0.4)", color: "hsl(315 100% 75%)" }}>
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            style={{ background: "hsl(335 80% 60% / 0.15)", border: "1px solid hsl(335 80% 60% / 0.3)", color: "hsl(335 80% 45%)" }}>
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             Свободные окна сегодня
           </div>
-          <h1 className="text-4xl font-oswald font-bold text-white leading-tight mb-2">
+          <h1 className="text-4xl font-oswald font-bold leading-tight mb-2" style={{ color: "hsl(335 60% 30%)" }}>
             Запишись<br /><span className="gradient-text">в один клик</span>
           </h1>
-          <p className="text-white/60 text-sm">Лучшие мастера · Удобное время · Без звонков</p>
+          <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Лучшие мастера · Удобное время · Без звонков</p>
+        </div>
+      </div>
+
+      {/* Master photo banner */}
+      <div className="px-4 mb-6 -mt-2">
+        <div className="card-glow rounded-3xl overflow-hidden relative">
+          <img src={MASTER_CRYO_IMG} alt="Мастер за работой" className="w-full h-56 object-cover" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(255,240,245,0.9) 0%, transparent 50%)" }} />
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="text-sm font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Галина Сиплатова</div>
+            <div className="text-xs" style={{ color: "hsl(335 40% 55%)" }}>Косметолог-эстетист · Криолиполиз</div>
+          </div>
+          {/* Flower decorations */}
+          <div className="absolute top-3 right-3 text-2xl opacity-60">🌸</div>
+          <div className="absolute top-3 left-3 text-xl opacity-50">✨</div>
         </div>
       </div>
 
       {/* Popular services */}
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-oswald font-semibold text-white">Популярные услуги</h2>
-          <button onClick={() => setPage("services")} className="text-sm" style={{ color: "hsl(315 100% 65%)" }}>
+          <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Популярные услуги</h2>
+          <button onClick={() => setPage("services")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>
             Все →
           </button>
         </div>
@@ -185,8 +219,8 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-3`}>
                 <Icon name={s.icon as any} size={18} className="text-white" />
               </div>
-              <div className="text-sm font-medium text-white leading-tight mb-2">{s.name}</div>
-              <div className="text-xs" style={{ color: "hsl(315 100% 65%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить цену"}</div>
+              <div className="text-sm font-medium leading-tight mb-2" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
+              <div className="text-xs font-medium" style={{ color: "hsl(335 80% 55%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить цену"}</div>
             </div>
           ))}
         </div>
@@ -195,24 +229,25 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
       {/* Masters */}
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-oswald font-semibold text-white">Наши мастера</h2>
-          <button onClick={() => setPage("masters")} className="text-sm" style={{ color: "hsl(315 100% 65%)" }}>
+          <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Наши мастера</h2>
+          <button onClick={() => setPage("masters")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>
             Все →
           </button>
         </div>
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
           {masters.map((m) => (
             <div key={m.id} className="flex-shrink-0 w-40 card-glow rounded-2xl overflow-hidden cursor-pointer">
-              <div className="h-40 overflow-hidden">
+              <div className="h-40 overflow-hidden relative">
                 <img src={m.img} alt={m.name} className="w-full h-full object-cover" />
+                <div className="absolute top-2 right-2 text-sm">🌸</div>
               </div>
               <div className="p-3">
-                <div className="text-sm font-semibold text-white truncate">{m.name}</div>
-                <div className="text-xs text-white/50 mb-2 truncate">{m.spec}</div>
+                <div className="text-sm font-semibold truncate" style={{ color: "hsl(335 50% 30%)" }}>{m.name}</div>
+                <div className="text-xs mb-2 truncate" style={{ color: "hsl(335 30% 55%)" }}>{m.spec}</div>
                 <div className="flex items-center gap-1">
-                  <span className="text-yellow-400 text-xs">★</span>
-                  <span className="text-xs text-white/70">{m.rating}</span>
-                  <span className="text-xs text-white/30">({m.reviews})</span>
+                  <span className="text-yellow-500 text-xs">★</span>
+                  <span className="text-xs font-medium" style={{ color: "hsl(335 50% 40%)" }}>{m.rating}</span>
+                  <span className="text-xs" style={{ color: "hsl(335 20% 65%)" }}>({m.reviews})</span>
                 </div>
               </div>
             </div>
@@ -224,9 +259,9 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
       <div className="px-4 mb-6">
         <button
           onClick={() => setPage("services")}
-          className="w-full py-4 rounded-2xl font-semibold text-white text-lg animate-pulse-glow"
-          style={{ background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }}>
-          Записаться сейчас
+          className="w-full py-4 rounded-2xl font-semibold text-white text-lg animate-pulse-glow shadow-lg"
+          style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+          🌸 Записаться сейчас
         </button>
       </div>
 
@@ -234,51 +269,49 @@ function HomePage({ setPage, startBooking }: { setPage: (p: Page) => void; start
       <div className="px-4 mb-2">
         <div className="card-glow rounded-3xl p-5 space-y-4">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0"
-              style={{ background: "white" }}>
-              <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
+              <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1 bg-white" />
             </div>
             <div>
-              <h2 className="text-lg font-oswald font-semibold text-white leading-tight">Girly Paradise</h2>
-              <p className="text-white/40 text-xs">Beauty Apartments</p>
+              <h2 className="text-lg font-oswald font-semibold leading-tight" style={{ color: "hsl(335 60% 30%)" }}>Girly Paradise</h2>
+              <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Beauty Apartments ✨</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <a href="tel:+79046015556" className="flex items-center gap-3 group flex-1">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "hsl(315 100% 60% / 0.15)" }}>
-                <Icon name="Phone" size={18} style={{ color: "hsl(315 100% 65%)" }} />
+                style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
+                <Icon name="Phone" size={18} style={{ color: "hsl(335 80% 55%)" }} />
               </div>
               <div>
-                <div className="text-white font-semibold group-hover:underline">+7 (904) 601-55-56</div>
-                <div className="text-white/40 text-xs">Нажми чтобы позвонить</div>
+                <div className="font-semibold group-hover:underline" style={{ color: "hsl(335 50% 30%)" }}>+7 (904) 601-55-56</div>
+                <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Нажми чтобы позвонить</div>
               </div>
             </a>
             <a href="https://wa.me/79046015556" target="_blank" rel="noopener noreferrer"
               className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:scale-105"
-              style={{ background: "hsl(142 70% 40% / 0.2)", border: "1px solid hsl(142 70% 40% / 0.3)" }}>
+              style={{ background: "hsl(142 60% 45% / 0.15)", border: "1px solid hsl(142 60% 70%)" }}>
               <span style={{ fontSize: 18 }}>💬</span>
             </a>
           </div>
           <a href="https://yandex.ru/profile/46803820767?lang=ru" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "hsl(270 100% 65% / 0.15)" }}>
-              <Icon name="MapPin" size={18} style={{ color: "hsl(270 100% 70%)" }} />
+              style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
+              <Icon name="MapPin" size={18} style={{ color: "hsl(335 80% 55%)" }} />
             </div>
             <div className="flex-1">
-              <div className="text-white font-semibold group-hover:underline">ул. Заречная, 10</div>
-              <div className="text-white/40 text-xs">Санкт-Петербург · м. Парнас · открыть на карте →</div>
+              <div className="font-semibold group-hover:underline" style={{ color: "hsl(335 50% 30%)" }}>ул. Заречная, 10</div>
+              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Санкт-Петербург · м. Парнас · открыть на карте →</div>
             </div>
           </a>
-
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "hsl(185 100% 55% / 0.15)" }}>
-              <Icon name="Clock" size={18} style={{ color: "hsl(185 100% 60%)" }} />
+              style={{ background: "hsl(335 80% 60% / 0.12)", border: "1px solid hsl(335 80% 80%)" }}>
+              <Icon name="Clock" size={18} style={{ color: "hsl(335 80% 55%)" }} />
             </div>
             <div>
-              <div className="text-white font-semibold">Ежедневно: 11:00 – 20:00</div>
-              <div className="text-white/40 text-xs">Без выходных</div>
+              <div className="font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Ежедневно: 11:00 – 20:00</div>
+              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Без выходных</div>
             </div>
           </div>
         </div>
@@ -299,18 +332,18 @@ function ServicesPage({ filteredServices, categories, activeCategory, setActiveC
   return (
     <div className="animate-fade-in">
       <div className="px-4 pt-12 pb-4">
-        <h1 className="text-3xl font-oswald font-bold text-white mb-1">Услуги</h1>
-        <p className="text-white/50 text-sm mb-4">Выбери что тебе нужно</p>
+        <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Услуги 🌸</h1>
+        <p className="text-sm mb-4" style={{ color: "hsl(335 30% 55%)" }}>Выбери что тебе нужно</p>
 
         {/* Search */}
         <div className="relative mb-4">
-          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск услуги..."
-            className="w-full pl-9 pr-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none"
-            style={{ background: "hsl(240 8% 12%)", border: "1px solid hsl(240 8% 20%)" }}
+            className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+            style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }}
           />
         </div>
 
@@ -322,8 +355,8 @@ function ServicesPage({ filteredServices, categories, activeCategory, setActiveC
               onClick={() => setActiveCategory(cat)}
               className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all"
               style={activeCategory === cat
-                ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))", color: "white" }
-                : { background: "hsl(240 8% 12%)", color: "hsl(0 0% 60%)", border: "1px solid hsl(240 8% 20%)" }
+                ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+                : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }
               }>
               {cat}
             </button>
@@ -338,16 +371,16 @@ function ServicesPage({ filteredServices, categories, activeCategory, setActiveC
             className="card-glow rounded-2xl p-4 flex items-center gap-4 cursor-pointer animate-slide-up"
             style={{ animationDelay: `${i * 0.05}s` }}
             onClick={() => startBooking(s)}>
-            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0`}>
+            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0 shadow-md`}>
               <Icon name={s.icon as any} size={22} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-white font-medium">{s.name}</div>
-              <div className="text-white/40 text-xs mt-0.5">{s.category} · {s.duration} мин</div>
+              <div className="font-medium" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
+              <div className="text-xs mt-0.5" style={{ color: "hsl(335 30% 60%)" }}>{s.category} · {s.duration} мин</div>
             </div>
             <div className="text-right flex-shrink-0">
-              <div className="font-bold font-oswald text-lg" style={{ color: "hsl(315 100% 65%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить"}</div>
-              <div className="text-xs text-white/30">за сеанс</div>
+              <div className="font-bold font-oswald text-lg" style={{ color: "hsl(335 80% 55%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить"}</div>
+              <div className="text-xs" style={{ color: "hsl(335 20% 65%)" }}>за сеанс</div>
             </div>
           </div>
         ))}
@@ -362,30 +395,32 @@ function MastersPage({ masters, setPage }: { masters: Master[]; setPage: (p: Pag
   return (
     <div className="animate-fade-in">
       <div className="px-4 pt-12 pb-6">
-        <h1 className="text-3xl font-oswald font-bold text-white mb-1">Мастера</h1>
-        <p className="text-white/50 text-sm">Профессионалы своего дела</p>
+        <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Мастера 🌸</h1>
+        <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Профессионалы своего дела</p>
       </div>
 
       <div className="px-4 space-y-4">
         {masters.map((m: any, i: number) => (
           <div key={m.id} className="card-glow rounded-3xl overflow-hidden animate-slide-up" style={{ animationDelay: `${i * 0.1}s` }}>
-            <div className="relative h-48 overflow-hidden">
+            <div className="relative h-56 overflow-hidden">
               <img src={m.img} alt={m.name} className="w-full h-full object-cover" />
               <div className="absolute inset-0" style={{
-                background: "linear-gradient(to bottom, transparent 40%, rgba(15,15,25,0.95) 100%)"
+                background: "linear-gradient(to bottom, rgba(255,220,230,0.1) 0%, rgba(255,240,245,0.92) 100%)"
               }} />
+              <div className="absolute top-3 right-3 text-2xl">✨</div>
+              <div className="absolute top-3 left-3 text-xl">🌸</div>
               <div className="absolute bottom-0 left-0 right-0 p-4">
                 <div className="flex items-end justify-between">
                   <div>
-                    <h3 className="text-xl font-oswald font-bold text-white">{m.name}</h3>
-                    <p className="text-white/60 text-sm">{m.spec}</p>
+                    <h3 className="text-xl font-oswald font-bold" style={{ color: "hsl(335 60% 25%)" }}>{m.name}</h3>
+                    <p className="text-sm" style={{ color: "hsl(335 40% 50%)" }}>{m.spec}</p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1 justify-end">
-                      <span className="text-yellow-400">★</span>
-                      <span className="text-white font-bold">{m.rating}</span>
+                      <span className="text-yellow-500">★</span>
+                      <span className="font-bold" style={{ color: "hsl(335 60% 30%)" }}>{m.rating}</span>
                     </div>
-                    <div className="text-white/40 text-xs">{m.reviews} отзывов</div>
+                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{m.reviews} отзывов</div>
                   </div>
                 </div>
               </div>
@@ -393,16 +428,16 @@ function MastersPage({ masters, setPage }: { masters: Master[]; setPage: (p: Pag
             <div className="p-4">
               <div className="flex flex-wrap gap-2 mb-4">
                 {m.tags.map((tag: string) => (
-                  <span key={tag} className="px-3 py-1 rounded-full text-xs"
-                    style={{ background: "hsl(315 100% 60% / 0.15)", color: "hsl(315 100% 70%)", border: "1px solid hsl(315 100% 60% / 0.3)" }}>
+                  <span key={tag} className="px-3 py-1 rounded-full text-xs font-medium"
+                    style={{ background: "hsl(335 80% 60% / 0.1)", color: "hsl(335 80% 50%)", border: "1px solid hsl(335 80% 80%)" }}>
                     {tag}
                   </span>
                 ))}
               </div>
               <button
                 onClick={() => setPage("services")}
-                className="w-full py-3 rounded-xl font-semibold text-white"
-                style={{ background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }}>
+                className="w-full py-3 rounded-xl font-semibold text-white shadow-md"
+                style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
                 Записаться к мастеру
               </button>
             </div>
@@ -455,12 +490,13 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
   if (bookingDone) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-scale-in">
-        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-float"
-          style={{ background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }}>
+        <div className="text-6xl mb-4 animate-float">🌸</div>
+        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
+          style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
           <Icon name="Check" size={40} className="text-white" />
         </div>
-        <h2 className="text-3xl font-oswald font-bold text-white text-center mb-2">Запись подтверждена!</h2>
-        <p className="text-white/50 text-center mb-8">Ждём тебя {wDays.find((d: any) => d.date === selectedDay)?.day} в {selectedTime}</p>
+        <h2 className="text-3xl font-oswald font-bold text-center mb-2" style={{ color: "hsl(335 60% 30%)" }}>Запись подтверждена!</h2>
+        <p className="text-center mb-8" style={{ color: "hsl(335 30% 55%)" }}>Ждём тебя {wDays.find((d: any) => d.date === selectedDay)?.day} в {selectedTime} ✨</p>
 
         <div className="w-full card-glow rounded-3xl p-5 mb-6">
           <div className="space-y-3">
@@ -469,18 +505,18 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
               { label: "Мастер", val: selectedMaster?.name || "Любой свободный" },
               { label: "День", val: `${wDays.find((d: any) => d.date === selectedDay)?.day}, ${selectedDay} мая` },
               { label: "Время", val: selectedTime },
-              { label: "Стоимость", val: `${selectedService?.price} ₽` },
+              { label: "Стоимость", val: selectedService?.price > 0 ? `${selectedService?.price} ₽` : "Уточнить" },
             ].map((item) => (
               <div key={item.label} className="flex justify-between items-center">
-                <span className="text-white/40 text-sm">{item.label}</span>
-                <span className="text-white font-medium text-sm">{item.val}</span>
+                <span className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>{item.label}</span>
+                <span className="font-medium text-sm" style={{ color: "hsl(335 50% 30%)" }}>{item.val}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <button onClick={() => setPage("home")} className="w-full py-4 rounded-2xl font-semibold text-white"
-          style={{ background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }}>
+        <button onClick={() => setPage("home")} className="w-full py-4 rounded-2xl font-semibold text-white shadow-md"
+          style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
           На главную
         </button>
       </div>
@@ -493,12 +529,12 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
       <div className="px-4 pt-12 pb-4 flex items-center gap-3">
         <button onClick={() => step === 1 ? setPage("services") : setStep(step - 1)}
           className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ background: "hsl(240 8% 15%)" }}>
-          <Icon name="ChevronLeft" size={20} className="text-white" />
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
         </button>
         <div>
-          <h1 className="text-xl font-oswald font-bold text-white">Запись на услугу</h1>
-          <p className="text-white/40 text-xs">Шаг {step} из 3</p>
+          <h1 className="text-xl font-oswald font-bold" style={{ color: "hsl(335 60% 30%)" }}>Запись на услугу</h1>
+          <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Шаг {step} из 3</p>
         </div>
       </div>
 
@@ -506,8 +542,8 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
       <div className="px-4 mb-6">
         <div className="flex gap-2">
           {[1, 2, 3].map((s) => (
-            <div key={s} className="flex-1 h-1 rounded-full transition-all duration-500"
-              style={{ background: s <= step ? "linear-gradient(90deg, hsl(315 100% 60%), hsl(270 100% 65%))" : "hsl(240 8% 20%)" }} />
+            <div key={s} className="flex-1 h-1.5 rounded-full transition-all duration-500"
+              style={{ background: s <= step ? "linear-gradient(90deg, hsl(335 80% 60%), hsl(315 70% 65%))" : "hsl(335 30% 90%)" }} />
           ))}
         </div>
       </div>
@@ -515,44 +551,44 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
       {/* Step 1: Choose service */}
       {step === 1 && (
         <div className="px-4 animate-slide-up">
-          <h2 className="text-lg font-semibold text-white mb-4">Выбери услугу</h2>
+          <h2 className="text-lg font-semibold mb-4" style={{ color: "hsl(335 60% 30%)" }}>Выбери услугу</h2>
           {selectedService && (
             <div className="card-glow rounded-2xl p-4 mb-4 flex items-center gap-3"
-              style={{ borderColor: "hsl(315 100% 60% / 0.5)" }}>
+              style={{ borderColor: "hsl(335 80% 70%)" }}>
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedService.color} flex items-center justify-center`}>
                 <Icon name={selectedService.icon as any} size={16} className="text-white" />
               </div>
               <div className="flex-1">
-                <div className="text-white font-medium text-sm">{selectedService.name}</div>
-                <div className="text-white/40 text-xs">{selectedService.price} ₽ · {selectedService.duration} мин</div>
+                <div className="font-medium text-sm" style={{ color: "hsl(335 50% 30%)" }}>{selectedService.name}</div>
+                <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{selectedService.price > 0 ? `${selectedService.price} ₽ · ` : ""}{selectedService.duration} мин</div>
               </div>
-              <Icon name="CheckCircle" size={20} style={{ color: "hsl(315 100% 65%)" }} />
+              <Icon name="CheckCircle" size={20} style={{ color: "hsl(335 80% 55%)" }} />
             </div>
           )}
           <div className="space-y-2 max-h-80 overflow-y-auto scrollbar-hide">
             {svcList.map((s: any) => (
               <div key={s.id}
                 className="card-glow rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all"
-                style={selectedService?.id === s.id ? { borderColor: "hsl(315 100% 60% / 0.5)", background: "hsl(315 100% 60% / 0.05)" } : {}}
+                style={selectedService?.id === s.id ? { borderColor: "hsl(335 80% 70%)", background: "hsl(335 80% 60% / 0.05)" } : {}}
                 onClick={() => setSelectedService(s)}>
                 <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0`}>
                   <Icon name={s.icon as any} size={14} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-white text-sm font-medium truncate">{s.name}</div>
-                  <div className="text-white/40 text-xs">{s.duration} мин</div>
+                  <div className="text-sm font-medium truncate" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
+                  <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{s.duration} мин</div>
                 </div>
-                <div className="text-sm font-bold" style={{ color: "hsl(315 100% 65%)" }}>{s.price} ₽</div>
+                <div className="text-sm font-bold" style={{ color: "hsl(335 80% 55%)" }}>{s.price > 0 ? `${s.price} ₽` : "Уточнить"}</div>
               </div>
             ))}
           </div>
           <button
             onClick={() => selectedService && setStep(2)}
             disabled={!selectedService}
-            className="mt-4 w-full py-4 rounded-2xl font-semibold text-white transition-all"
+            className="mt-4 w-full py-4 rounded-2xl font-semibold text-white transition-all shadow-md"
             style={selectedService
-              ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }
-              : { background: "hsl(240 8% 20%)", color: "hsl(0 0% 40%)" }}>
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }
+              : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
             Далее →
           </button>
         </div>
@@ -561,53 +597,53 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
       {/* Step 2: Choose master & time */}
       {step === 2 && (
         <div className="px-4 animate-slide-up">
-          <h2 className="text-lg font-semibold text-white mb-4">Мастер и время</h2>
+          <h2 className="text-lg font-semibold mb-4" style={{ color: "hsl(335 60% 30%)" }}>Мастер и время</h2>
 
-          <p className="text-white/40 text-xs mb-2 uppercase tracking-wider">Мастер</p>
+          <p className="text-xs mb-2 uppercase tracking-wider font-medium" style={{ color: "hsl(335 40% 60%)" }}>Мастер</p>
           <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-3 mb-4">
             <div onClick={() => setSelectedMaster(null)} className="flex-shrink-0 flex flex-col items-center gap-2 cursor-pointer">
               <div className="w-14 h-14 rounded-full flex items-center justify-center transition-all"
                 style={!selectedMaster
-                  ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))", boxShadow: "0 0 20px hsl(315 100% 60% / 0.4)" }
-                  : { background: "hsl(240 8% 18%)" }}>
-                <Icon name="Users" size={20} className="text-white" />
+                  ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 0 20px hsl(335 80% 60% / 0.3)" }
+                  : { background: "hsl(335 30% 92%)" }}>
+                <Icon name="Users" size={20} style={{ color: !selectedMaster ? "white" : "hsl(335 50% 55%)" }} />
               </div>
-              <span className="text-xs text-white/60">Любой</span>
+              <span className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>Любой</span>
             </div>
             {mstrList.map((m: any) => (
               <div key={m.id} onClick={() => setSelectedMaster(m)} className="flex-shrink-0 flex flex-col items-center gap-2 cursor-pointer">
                 <div className="relative">
                   <img src={m.img} alt={m.name} className="w-14 h-14 rounded-full object-cover transition-all"
                     style={selectedMaster?.id === m.id
-                      ? { outline: "3px solid hsl(315 100% 60%)", outlineOffset: "2px" }
-                      : { opacity: 0.6 }} />
+                      ? { outline: "3px solid hsl(335 80% 58%)", outlineOffset: "2px" }
+                      : { opacity: 0.7 }} />
                   {selectedMaster?.id === m.id && (
                     <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ background: "hsl(315 100% 55%)" }}>
+                      style={{ background: "hsl(335 80% 58%)" }}>
                       <Icon name="Check" size={10} className="text-white" />
                     </div>
                   )}
                 </div>
-                <span className="text-xs text-white/60 text-center w-16 truncate">{m.name.split(" ")[0]}</span>
+                <span className="text-xs text-center w-16 truncate" style={{ color: "hsl(335 30% 60%)" }}>{m.name.split(" ")[0]}</span>
               </div>
             ))}
           </div>
 
-          <p className="text-white/40 text-xs mb-2 uppercase tracking-wider">День</p>
+          <p className="text-xs mb-2 uppercase tracking-wider font-medium" style={{ color: "hsl(335 40% 60%)" }}>День</p>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-4">
             {wDays.map((d: any) => (
               <button key={d.date} onClick={() => setSelectedDay(d.date)}
                 className="flex-shrink-0 w-12 py-3 rounded-2xl text-center transition-all"
                 style={selectedDay === d.date
-                  ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))", color: "white" }
-                  : { background: "hsl(240 8% 12%)", color: "hsl(0 0% 60%)" }}>
+                  ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+                  : { background: "white", color: "hsl(335 40% 55%)", border: "1px solid hsl(335 40% 88%)" }}>
                 <div className="text-xs opacity-70">{d.day}</div>
                 <div className="text-lg font-bold font-oswald">{d.date}</div>
               </button>
             ))}
           </div>
 
-          <p className="text-white/40 text-xs mb-2 uppercase tracking-wider">Время</p>
+          <p className="text-xs mb-2 uppercase tracking-wider font-medium" style={{ color: "hsl(335 40% 60%)" }}>Время</p>
           <div className="grid grid-cols-4 gap-2 mb-4">
             {tSlots.map((t: string) => {
               const busy = bSlots.includes(t);
@@ -615,10 +651,10 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
                 <button key={t} onClick={() => !busy && setSelectedTime(t)} disabled={busy}
                   className="py-2 rounded-xl text-sm font-medium transition-all"
                   style={busy
-                    ? { background: "hsl(240 8% 12%)", color: "hsl(0 0% 30%)", textDecoration: "line-through" }
+                    ? { background: "hsl(335 20% 94%)", color: "hsl(335 20% 75%)", textDecoration: "line-through" }
                     : selectedTime === t
-                      ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))", color: "white" }
-                      : { background: "hsl(240 8% 15%)", color: "white", border: "1px solid hsl(240 8% 22%)" }
+                      ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+                      : { background: "white", color: "hsl(335 50% 45%)", border: "1px solid hsl(335 40% 85%)" }
                   }>
                   {t}
                 </button>
@@ -627,10 +663,10 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
           </div>
 
           <button onClick={() => selectedTime && setStep(3)} disabled={!selectedTime}
-            className="w-full py-4 rounded-2xl font-semibold text-white transition-all"
+            className="w-full py-4 rounded-2xl font-semibold text-white transition-all shadow-md"
             style={selectedTime
-              ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }
-              : { background: "hsl(240 8% 20%)", color: "hsl(0 0% 40%)" }}>
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }
+              : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
             Далее →
           </button>
         </div>
@@ -639,8 +675,8 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
       {/* Step 3: Contact details */}
       {step === 3 && (
         <div className="px-4 animate-slide-up">
-          <h2 className="text-lg font-semibold text-white mb-2">Ваши данные</h2>
-          <p className="text-white/40 text-sm mb-6">Для подтверждения записи</p>
+          <h2 className="text-lg font-semibold mb-2" style={{ color: "hsl(335 60% 30%)" }}>Ваши данные</h2>
+          <p className="text-sm mb-6" style={{ color: "hsl(335 30% 60%)" }}>Для подтверждения записи</p>
 
           <div className="card-glow rounded-2xl p-4 mb-6">
             <div className="space-y-2">
@@ -649,11 +685,11 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
                 { label: "Мастер", val: selectedMaster?.name || "Любой свободный" },
                 { label: "День", val: `${wDays.find((d: any) => d.date === selectedDay)?.day}, ${selectedDay} мая` },
                 { label: "Время", val: selectedTime },
-                { label: "Стоимость", val: `${selectedService?.price} ₽` },
+                { label: "Стоимость", val: selectedService?.price > 0 ? `${selectedService?.price} ₽` : "Уточнить" },
               ].map((item) => (
                 <div key={item.label} className="flex justify-between">
-                  <span className="text-white/40 text-sm">{item.label}</span>
-                  <span className="text-white text-sm font-medium">{item.val}</span>
+                  <span className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>{item.label}</span>
+                  <span className="text-sm font-medium" style={{ color: "hsl(335 50% 30%)" }}>{item.val}</span>
                 </div>
               ))}
             </div>
@@ -661,41 +697,41 @@ function BookingPage({ step, setStep, selectedService, setSelectedService, selec
 
           <div className="space-y-3 mb-6">
             <div>
-              <label className="text-white/50 text-xs mb-1 block uppercase tracking-wider">Ваше имя</label>
+              <label className="text-xs mb-1 block uppercase tracking-wider font-medium" style={{ color: "hsl(335 40% 60%)" }}>Ваше имя</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Введите имя"
-                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/20 outline-none"
-                style={{ background: "hsl(240 8% 12%)", border: "1px solid hsl(240 8% 20%)" }} />
+                className="w-full px-4 py-3 rounded-xl outline-none"
+                style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
             </div>
             <div>
-              <label className="text-white/50 text-xs mb-1 block uppercase tracking-wider">Телефон</label>
+              <label className="text-xs mb-1 block uppercase tracking-wider font-medium" style={{ color: "hsl(335 40% 60%)" }}>Телефон</label>
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 (999) 000-00-00" type="tel"
-                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/20 outline-none"
-                style={{ background: "hsl(240 8% 12%)", border: "1px solid hsl(240 8% 20%)" }} />
+                className="w-full px-4 py-3 rounded-xl outline-none"
+                style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
             </div>
             <div>
-              <label className="text-white/50 text-xs mb-1 block uppercase tracking-wider">Email для подтверждения</label>
+              <label className="text-xs mb-1 block uppercase tracking-wider font-medium" style={{ color: "hsl(335 40% 60%)" }}>Email для подтверждения</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" type="email"
-                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/20 outline-none"
-                style={{ background: "hsl(240 8% 12%)", border: "1px solid hsl(240 8% 20%)" }} />
+                className="w-full px-4 py-3 rounded-xl outline-none"
+                style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
             </div>
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm text-center mb-3">{error}</p>
+            <p className="text-red-500 text-sm text-center mb-3">{error}</p>
           )}
           <button onClick={handleConfirm} disabled={!name || !phone || loading}
-            className="w-full py-4 rounded-2xl font-semibold text-white text-lg transition-all flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl font-semibold text-white text-lg transition-all flex items-center justify-center gap-2 shadow-md"
             style={name && phone && !loading
-              ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }
-              : { background: "hsl(240 8% 20%)", color: "hsl(0 0% 40%)" }}>
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }
+              : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
             {loading ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Отправляем...
               </>
-            ) : "Подтвердить запись"}
+            ) : "🌸 Подтвердить запись"}
           </button>
-          <p className="text-center text-white/20 text-xs mt-3">Нажимая кнопку, вы соглашаетесь с условиями</p>
+          <p className="text-center text-xs mt-3" style={{ color: "hsl(335 20% 70%)" }}>Нажимая кнопку, вы соглашаетесь с условиями</p>
         </div>
       )}
     </div>
@@ -710,13 +746,13 @@ function ProfilePage({ myBookings }: { myBookings: any[] }) {
     <div className="animate-fade-in">
       <div className="px-4 pt-12 pb-6">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
-            style={{ background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))" }}>
-            А
+          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md"
+            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+            🌸
           </div>
           <div>
-            <h2 className="text-xl font-oswald font-bold text-white">Анна Иванова</h2>
-            <p className="text-white/40 text-sm">+7 (999) 123-45-67</p>
+            <h2 className="text-xl font-oswald font-bold" style={{ color: "hsl(335 60% 30%)" }}>Анна Иванова</h2>
+            <p className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>+7 (999) 123-45-67</p>
           </div>
         </div>
 
@@ -727,27 +763,27 @@ function ProfilePage({ myBookings }: { myBookings: any[] }) {
             { val: "4.8★", label: "Мой рейтинг" },
           ].map((item) => (
             <div key={item.label} className="card-glow rounded-2xl p-3 text-center">
-              <div className="text-lg font-bold font-oswald" style={{ color: "hsl(315 100% 65%)" }}>{item.val}</div>
-              <div className="text-xs text-white/40">{item.label}</div>
+              <div className="text-lg font-bold font-oswald" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{item.label}</div>
             </div>
           ))}
         </div>
       </div>
 
       <div className="px-4 mb-4">
-        <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(240 8% 12%)" }}>
+        <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
           <button onClick={() => setTab("upcoming")}
             className="flex-1 py-3 text-sm font-medium transition-all"
             style={tab === "upcoming"
-              ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))", color: "white" }
-              : { color: "hsl(0 0% 50%)" }}>
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+              : { color: "hsl(335 40% 60%)" }}>
             Предстоящие
           </button>
           <button onClick={() => setTab("done")}
             className="flex-1 py-3 text-sm font-medium transition-all"
             style={tab === "done"
-              ? { background: "linear-gradient(135deg, hsl(315 100% 55%), hsl(270 100% 60%))", color: "white" }
-              : { color: "hsl(0 0% 50%)" }}>
+              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+              : { color: "hsl(335 40% 60%)" }}>
             История
           </button>
         </div>
@@ -756,26 +792,26 @@ function ProfilePage({ myBookings }: { myBookings: any[] }) {
       <div className="px-4 space-y-3">
         {filtered.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-4xl mb-3">📅</div>
-            <p className="text-white/30">Нет записей</p>
+            <div className="text-4xl mb-3">🌸</div>
+            <p style={{ color: "hsl(335 30% 65%)" }}>Нет записей</p>
           </div>
         )}
         {filtered.map((b: any, i: number) => (
           <div key={b.id} className="card-glow rounded-2xl p-4 animate-slide-up" style={{ animationDelay: `${i * 0.1}s` }}>
             <div className="flex justify-between items-start mb-3">
               <div>
-                <h3 className="text-white font-semibold">{b.service}</h3>
-                <p className="text-white/40 text-sm">{b.master}</p>
+                <h3 className="font-semibold" style={{ color: "hsl(335 50% 30%)" }}>{b.service}</h3>
+                <p className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>{b.master}</p>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-medium"
                 style={b.status === "upcoming"
-                  ? { background: "hsl(315 100% 60% / 0.15)", color: "hsl(315 100% 70%)" }
-                  : { background: "hsl(240 8% 20%)", color: "hsl(0 0% 50%)" }}>
+                  ? { background: "hsl(335 80% 60% / 0.12)", color: "hsl(335 80% 50%)", border: "1px solid hsl(335 80% 80%)" }
+                  : { background: "hsl(335 20% 93%)", color: "hsl(335 30% 65%)" }}>
                 {b.status === "upcoming" ? "Скоро" : "Завершено"}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-white/40 text-sm">
+              <div className="flex items-center gap-3 text-sm" style={{ color: "hsl(335 30% 60%)" }}>
                 <span className="flex items-center gap-1">
                   <Icon name="Calendar" size={13} />
                   {b.date}
@@ -785,17 +821,17 @@ function ProfilePage({ myBookings }: { myBookings: any[] }) {
                   {b.time}
                 </span>
               </div>
-              <span className="font-bold font-oswald" style={{ color: "hsl(315 100% 65%)" }}>{b.price} ₽</span>
+              <span className="font-bold font-oswald" style={{ color: "hsl(335 80% 55%)" }}>{b.price} ₽</span>
             </div>
             {b.status === "upcoming" && (
-              <button className="mt-3 w-full py-2 rounded-xl text-sm text-white/50 transition-all"
-                style={{ border: "1px solid hsl(240 8% 22%)" }}>
+              <button className="mt-3 w-full py-2 rounded-xl text-sm transition-all"
+                style={{ border: "1px solid hsl(335 40% 85%)", color: "hsl(335 40% 65%)" }}>
                 Отменить запись
               </button>
             )}
             {b.status === "done" && (
               <button className="mt-3 w-full py-2 rounded-xl text-sm font-medium transition-all"
-                style={{ background: "hsl(315 100% 60% / 0.1)", color: "hsl(315 100% 70%)", border: "1px solid hsl(315 100% 60% / 0.2)" }}>
+                style={{ background: "hsl(335 80% 60% / 0.08)", color: "hsl(335 80% 55%)", border: "1px solid hsl(335 80% 82%)" }}>
                 ★ Оставить отзыв
               </button>
             )}
@@ -817,16 +853,16 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-2 pb-2">
-      <div className="rounded-3xl px-2 py-3 flex justify-around"
-        style={{ background: "hsl(240 8% 10% / 0.95)", backdropFilter: "blur(20px)", border: "1px solid hsl(240 8% 18%)" }}>
+      <div className="rounded-3xl px-2 py-3 flex justify-around shadow-lg"
+        style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)", border: "1px solid hsl(335 40% 88%)" }}>
         {items.map((item) => (
           <button key={item.id} onClick={() => setPage(item.id)}
             className="flex flex-col items-center gap-1 px-3 py-1 rounded-2xl transition-all"
-            style={page === item.id ? { background: "hsl(315 100% 60% / 0.15)" } : {}}>
+            style={page === item.id ? { background: "hsl(335 80% 60% / 0.12)" } : {}}>
             <Icon name={item.icon as any} size={20}
-              style={{ color: page === item.id ? "hsl(315 100% 65%)" : "hsl(0 0% 45%)" }} />
+              style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }} />
             <span className="text-xs font-medium"
-              style={{ color: page === item.id ? "hsl(315 100% 65%)" : "hsl(0 0% 40%)" }}>
+              style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }}>
               {item.label}
             </span>
           </button>
