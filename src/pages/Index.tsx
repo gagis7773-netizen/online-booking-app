@@ -644,7 +644,8 @@ export default function Index() {
           />
         )}
         {page === "profile" && (
-          <ProfilePage client={client} onLogin={handleLogin} onLogout={handleLogout} setPage={setPage} />
+          <ProfilePage client={client} onLogin={handleLogin} onLogout={handleLogout} setPage={setPage}
+            scheduledSlots={scheduledSlots} weekDays={weekDays} timeSlots={timeSlots} />
         )}
         {page === "reviews" && <ReviewsPage onBack={() => navigateBack("home")} />}
         {page === "gallery" && <ClientGalleryPage setPage={navigateTo} onBack={() => navigateBack("home")} />}
@@ -1454,7 +1455,7 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
 
 // ─── ПРОФИЛЬ / ВХОД / РЕГИСТРАЦИЯ ───────────────────────────────────────────
 
-function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLogin: (c: any) => void; onLogout: () => void; setPage: (p: Page) => void }) {
+function ProfilePage({ client, onLogin, onLogout, setPage, scheduledSlots, weekDays: wDays, timeSlots: tSlots }: { client: any; onLogin: (c: any) => void; onLogout: () => void; setPage: (p: Page) => void; scheduledSlots?: Record<string, string[]>; weekDays?: any[]; timeSlots?: string[] }) {
   const [mode, setMode] = useState<"auth" | "register">("auth");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -1573,10 +1574,10 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
     );
   }
 
-  return <ProfileDashboard client={client} onLogout={onLogout} setPage={setPage} />;
+  return <ProfileDashboard client={client} onLogout={onLogout} setPage={setPage} scheduledSlots={scheduledSlots} weekDays={wDays} timeSlots={tSlots} />;
 }
 
-function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout: () => void; setPage: (p: Page) => void }) {
+function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, weekDays: wDays = [], timeSlots: tSlots = [] }: { client: any; onLogout: () => void; setPage: (p: Page) => void; scheduledSlots?: Record<string, string[]>; weekDays?: any[]; timeSlots?: string[] }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [tab, setTab] = useState<"upcoming" | "done" | "orders">("upcoming");
@@ -1596,6 +1597,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleDay, setRescheduleDay] = useState(0); // индекс в wDays
   const siteUrl = window.location.href;
 
   const loadShopOrders = () => {
@@ -1931,40 +1933,119 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
                 </button>
               </div>
             )}
-            {/* Модал переноса */}
+            {/* Модал переноса — с календарём свободных окон */}
             {rescheduleBooking && (
-              <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
+              <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
                 onClick={() => setRescheduleBooking(null)}>
-                <div className="w-full max-w-md rounded-t-3xl p-6 space-y-4" style={{ background: "white" }}
+                <div className="w-full max-w-md rounded-t-3xl pb-8 overflow-y-auto" style={{ background: "white", maxHeight: "90vh" }}
                   onClick={e => e.stopPropagation()}>
-                  <div className="text-base font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Перенести запись</div>
-                  <div className="text-xs mb-1" style={{ color: "hsl(335 30% 60%)" }}>
-                    {Array.isArray(rescheduleBooking.services) ? rescheduleBooking.services.join(", ") : rescheduleBooking.service}
+
+                  {/* Шапка */}
+                  <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "hsl(335 30% 92%)" }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-base font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Перенести запись</div>
+                      <button onClick={() => setRescheduleBooking(null)} className="w-8 h-8 rounded-full flex items-center justify-center"
+                        style={{ background: "hsl(335 20% 93%)" }}>
+                        <Icon name="X" size={16} style={{ color: "hsl(335 40% 60%)" }} />
+                      </button>
+                    </div>
+                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>
+                      {Array.isArray(rescheduleBooking.services) ? rescheduleBooking.services.join(", ") : rescheduleBooking.service}
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(335 30% 60%)" }}>Новая дата</label>
-                    <input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)}
-                      min={new Date().toISOString().slice(0, 10)}
-                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                      style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(335 30% 60%)" }}>Новое время</label>
-                    <input type="time" value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                      style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setRescheduleBooking(null)}
-                      className="flex-1 py-3 rounded-xl text-sm font-semibold"
-                      style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
-                      Отмена
-                    </button>
-                    <button onClick={doReschedule} disabled={!rescheduleDate || !rescheduleTime || rescheduling}
-                      className="flex-1 py-3 rounded-xl text-sm font-semibold text-white"
-                      style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
-                      {rescheduling ? "Переносим..." : "Подтвердить"}
-                    </button>
+
+                  <div className="px-5 pt-4">
+                    {/* Выбор дня */}
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "hsl(335 40% 60%)" }}>Выбери день</p>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-4">
+                      {wDays.map((d: any, idx: number) => {
+                        const y = d.full.getFullYear();
+                        const m = String(d.full.getMonth() + 1).padStart(2, "0");
+                        const dd = String(d.full.getDate()).padStart(2, "0");
+                        const dateStr = `${y}-${m}-${dd}`;
+                        const busyCount = (scheduledSlots[dateStr] || []).length;
+                        const freeCount = tSlots.length - busyCount;
+                        const isSelected = rescheduleDay === idx;
+                        return (
+                          <button key={idx}
+                            onClick={() => { setRescheduleDay(idx); setRescheduleTime(""); setRescheduleDate(dateStr); }}
+                            className="flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-2xl transition-all"
+                            style={isSelected
+                              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+                              : { background: "hsl(335 20% 96%)", color: "hsl(335 40% 55%)", border: "1px solid hsl(335 40% 88%)" }}>
+                            <span className="text-[10px] mb-0.5">{d.day}</span>
+                            <span className="text-lg font-oswald font-bold leading-none">{d.date}</span>
+                            <span className="text-[10px] mb-1">{d.month}</span>
+                            <span className="text-[9px] font-medium"
+                              style={{ color: isSelected ? "rgba(255,255,255,0.8)" : freeCount > 0 ? "hsl(142 55% 45%)" : "hsl(0 55% 55%)" }}>
+                              {freeCount > 0 ? `${freeCount} св.` : "занято"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Свободные слоты для выбранного дня */}
+                    {rescheduleDate && (() => {
+                      const busyForDay = scheduledSlots[rescheduleDate] || [];
+                      const freeSlots = tSlots.filter((t: string) => !busyForDay.includes(t));
+                      return (
+                        <>
+                          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "hsl(335 40% 60%)" }}>
+                            Свободное время
+                          </p>
+                          {freeSlots.length === 0 ? (
+                            <div className="text-center py-4 text-sm" style={{ color: "hsl(335 30% 65%)" }}>
+                              На этот день нет свободных окон
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-4 gap-2 mb-5">
+                              {freeSlots.map((t: string) => (
+                                <button key={t} onClick={() => setRescheduleTime(t)}
+                                  className="py-2.5 rounded-xl text-sm font-medium transition-all"
+                                  style={rescheduleTime === t
+                                    ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
+                                    : { background: "hsl(335 20% 96%)", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 40% 88%)" }}>
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* Итог + кнопка */}
+                    {rescheduleDate && rescheduleTime && (
+                      <div className="card-glow rounded-2xl p-3 mb-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: "hsl(335 80% 60% / 0.12)" }}>
+                          <Icon name="CalendarCheck" size={18} style={{ color: "hsl(335 80% 55%)" }} />
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold" style={{ color: "hsl(335 50% 30%)" }}>
+                            {wDays[rescheduleDay]?.day}, {wDays[rescheduleDay]?.date} {wDays[rescheduleDay]?.month} в {rescheduleTime}
+                          </div>
+                          <div className="text-[11px]" style={{ color: "hsl(335 30% 60%)" }}>Новое время записи</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button onClick={() => setRescheduleBooking(null)}
+                        className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                        style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                        Отмена
+                      </button>
+                      <button onClick={doReschedule}
+                        disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                        className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all"
+                        style={rescheduleDate && rescheduleTime
+                          ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }
+                          : { background: "hsl(335 20% 85%)", color: "hsl(335 20% 65%)" }}>
+                        {rescheduling ? "Переносим..." : "Перенести"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1994,7 +2075,16 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
                 {(b.status === "upcoming" || b.status === "confirmed") && (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => { setRescheduleBooking(b); setRescheduleDate(""); setRescheduleTime(""); }}
+                      onClick={() => {
+                        setRescheduleBooking(b);
+                        setRescheduleDay(0);
+                        setRescheduleTime("");
+                        // Сразу ставим дату первого доступного дня
+                        if (wDays[0]) {
+                          const d = wDays[0].full;
+                          setRescheduleDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+                        } else { setRescheduleDate(""); }
+                      }}
                       className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
                       style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
                       <Icon name="CalendarClock" size={13} /> Перенести
