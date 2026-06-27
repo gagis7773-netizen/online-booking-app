@@ -3988,6 +3988,14 @@ function AdminGalleryFolders() {
 }
 
 // ── Редактор прайс-листа ──
+const PRICELIST_CATS_KEY = "gp_pricelist_cats";
+const DEFAULT_CATS = ["Криолиполиз", "Лицо", "Тело", "Волосы", "СПА", "РФ-лифтинг", "Другое"];
+
+function loadCats(): string[] {
+  try { return JSON.parse(localStorage.getItem(PRICELIST_CATS_KEY) || "null") || DEFAULT_CATS; } catch { return DEFAULT_CATS; }
+}
+function saveCats(c: string[]) { localStorage.setItem(PRICELIST_CATS_KEY, JSON.stringify(c)); }
+
 function AdminPricelistEditor() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3996,8 +4004,25 @@ function AdminPricelistEditor() {
   const [form, setForm] = useState({ name: "", category: "", price: "", duration: "", description: "", photo_url: "" });
   const [saving, setSaving] = useState(false);
   const [uploadingServicePhoto, setUploadingServicePhoto] = useState(false);
+  const [cats, setCats] = useState<string[]>(loadCats);
+  const [editingCats, setEditingCats] = useState(false);
+  const [newCat, setNewCat] = useState("");
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
-  const cats = ["Криолиполиз", "Лицо", "Тело", "Волосы", "СПА", "РФ-лифтинг", "Другое"];
+
+  const addCat = () => {
+    const v = newCat.trim();
+    if (!v || cats.includes(v)) return;
+    const next = [...cats, v];
+    setCats(next); saveCats(next); setNewCat("");
+  };
+
+  const removeCat = (c: string) => {
+    const next = cats.filter(x => x !== c);
+    setCats(next); saveCats(next);
+    if (form.category === c) setForm(p => ({ ...p, category: "" }));
+  };
+
+  const resetCats = () => { setCats(DEFAULT_CATS); saveCats(DEFAULT_CATS); };
 
   const load = () => adminPost("pricelist_custom").then(d => { setItems(d.items || []); setLoading(false); });
   useEffect(() => { load(); }, []);
@@ -4031,6 +4056,51 @@ function AdminPricelistEditor() {
   return (
     <div className="px-4 pb-6">
       <p className="text-xs mb-3" style={PS}>Услуги здесь отображаются клиентам в Прайс-листе</p>
+
+      {/* Редактор категорий */}
+      {!adding && !editing && (
+        <div className="card-glow rounded-2xl p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-semibold text-sm" style={P}>Категории прайса</div>
+            <button onClick={() => setEditingCats(!editingCats)}
+              className="px-3 py-1 rounded-xl text-xs font-medium"
+              style={editingCats ? { ...GRAD, color: "white" } : { background: "hsl(335 20% 93%)", color: "hsl(335 50% 50%)" }}>
+              {editingCats ? "Готово" : "✏️ Изменить"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {cats.map(c => (
+              <div key={c} className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium"
+                style={{ background: "hsl(335 80% 97%)", color: "hsl(335 60% 40%)", border: "1px solid hsl(335 60% 85%)" }}>
+                {c}
+                {editingCats && (
+                  <button onClick={() => removeCat(c)} className="ml-0.5 text-[10px] font-bold leading-none"
+                    style={{ color: "hsl(0 60% 55%)" }}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+          {editingCats && (
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input value={newCat} onChange={e => setNewCat(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addCat()}
+                  placeholder="Новая категория..." autoComplete="off"
+                  className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={inp} />
+                <button onClick={addCat} disabled={!newCat.trim()}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                  style={GRAD}>
+                  + Добавить
+                </button>
+              </div>
+              <button onClick={resetCats} className="text-xs" style={{ color: "hsl(335 30% 65%)" }}>
+                Сбросить к стандартным
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {!adding && !editing && (
         <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
           + Добавить услугу
@@ -6615,7 +6685,6 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "gallery", icon: "Images", label: "Галерея" },
-    { id: "booking", icon: "CalendarPlus", label: "Запись" },
     { id: "shop", icon: "ShoppingBag", label: "Магазин" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
