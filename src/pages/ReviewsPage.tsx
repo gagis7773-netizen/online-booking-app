@@ -28,7 +28,23 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
   const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [done, setDone] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Поднимаем модал над клавиатурой через visualViewport
+  useEffect(() => {
+    if (!showForm) { setKeyboardOffset(0); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const offset = window.innerHeight - vv.height - vv.offsetTop;
+      setKeyboardOffset(Math.max(0, offset));
+    };
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    onResize();
+    return () => { vv.removeEventListener("resize", onResize); vv.removeEventListener("scroll", onResize); };
+  }, [showForm]);
 
   useEffect(() => {
     loadReviews();
@@ -267,7 +283,7 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.5)" }}
           onClick={() => setShowForm(false)}>
           <div className="w-full max-w-lg mx-auto rounded-t-3xl flex flex-col"
-            style={{ background: "white", maxHeight: "80dvh" }}
+            style={{ background: "white", maxHeight: "80dvh", transform: `translateY(-${keyboardOffset}px)`, transition: "transform 0.2s ease" }}
             onClick={e => e.stopPropagation()}>
 
             {/* Шапка — всегда видна, не скроллится */}
