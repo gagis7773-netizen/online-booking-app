@@ -364,9 +364,14 @@ def handler(event: dict, context) -> dict:
             conn.commit(); conn.close(); return resp({"ok": True})
         folder_id = body.get("folder_id")
         if folder_id:
+            # Строго только фото этой папки — никаких чужих
             cur.execute(f"SELECT * FROM {SCHEMA}.admin_gallery WHERE folder_id=%s AND category!='archived' ORDER BY created_at DESC", (folder_id,))
-        else:
+        elif body.get("all"):
+            # Все фото (для админа без фильтра)
             cur.execute(f"SELECT * FROM {SCHEMA}.admin_gallery WHERE category!='archived' ORDER BY created_at DESC")
+        else:
+            # Без folder_id — возвращаем пустой список (не смешиваем папки)
+            conn.close(); return resp({"gallery": []})
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"gallery": rows})
 

@@ -3732,6 +3732,9 @@ function AdminGalleryFolders() {
   const [photoSize, setPhotoSize] = useState<"small" | "medium" | "large" | "wide">("medium");
   const [editingSize, setEditingSize] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
+  const [editingFolder, setEditingFolder] = useState(false);
+  const [editFolderForm, setEditFolderForm] = useState({ name: "", description: "" });
+  const [savingFolder, setSavingFolder] = useState(false);
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
   const SIZE_OPTIONS = [
@@ -3782,6 +3785,14 @@ function AdminGalleryFolders() {
     loadFolders();
   };
 
+  const saveFolder = async () => {
+    if (!editFolderForm.name.trim() || !activeFolder) return;
+    setSavingFolder(true);
+    await adminPost("gallery_folders", { action: "update", id: activeFolder.id, name: editFolderForm.name, description: editFolderForm.description, cover_url: activeFolder.cover_url || "" });
+    setActiveFolder((f: any) => ({ ...f, name: editFolderForm.name, description: editFolderForm.description }));
+    setEditingFolder(false); setSavingFolder(false); loadFolders();
+  };
+
   const removePhoto = async (id: number) => {
     await adminPost("gallery", { action: "deactivate", id }); loadPhotos(activeFolder.id);
   };
@@ -3794,11 +3805,49 @@ function AdminGalleryFolders() {
 
   if (activeFolder) return (
     <div className="px-4 pb-6">
-      <button onClick={() => { setActiveFolder(null); setPhotos([]); }} className="flex items-center gap-2 text-sm mb-4" style={PS}>
+      <button onClick={() => { setActiveFolder(null); setPhotos([]); setEditingFolder(false); }} className="flex items-center gap-2 text-sm mb-4" style={PS}>
         <Icon name="ChevronLeft" size={16} /> Все папки
       </button>
-      <h2 className="text-lg font-oswald font-bold mb-1" style={P}>{activeFolder.name}</h2>
-      {activeFolder.description && <p className="text-xs mb-4" style={PS}>{activeFolder.description}</p>}
+
+      {/* Заголовок папки — с кнопкой редактирования */}
+      {!editingFolder ? (
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <h2 className="text-lg font-oswald font-bold" style={P}>{activeFolder.name}</h2>
+            {activeFolder.description && <p className="text-xs mt-0.5" style={PS}>{activeFolder.description}</p>}
+          </div>
+          <button
+            onClick={() => { setEditFolderForm({ name: activeFolder.name, description: activeFolder.description || "" }); setEditingFolder(true); }}
+            className="ml-2 px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
+            style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>
+            ✏️ Изменить
+          </button>
+        </div>
+      ) : (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div className="font-semibold text-sm mb-1" style={P}>Редактирование папки</div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Название</label>
+            <input value={editFolderForm.name} onChange={e => setEditFolderForm(p => ({ ...p, name: e.target.value }))}
+              autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Описание (необязательно)</label>
+            <input value={editFolderForm.description} onChange={e => setEditFolderForm(p => ({ ...p, description: e.target.value }))}
+              autoComplete="off" placeholder="Описание папки..." className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={saveFolder} disabled={savingFolder || !editFolderForm.name.trim()}
+              className="flex-1 py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              {savingFolder ? "Сохраняем..." : "Сохранить"}
+            </button>
+            <button onClick={() => setEditingFolder(false)}
+              className="px-4 py-2.5 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
 
       <button onClick={() => setAddingPhoto(!addingPhoto)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
         {addingPhoto ? "✕ Отмена" : "+ Добавить фото"}
@@ -4024,6 +4073,20 @@ function AdminPricelistEditor() {
 
   const resetCats = () => { setCats(DEFAULT_CATS); saveCats(DEFAULT_CATS); };
 
+  // Drag & drop категорий
+  const [dragCat, setDragCat] = useState<string | null>(null);
+  const [dragOverCat, setDragOverCat] = useState<string | null>(null);
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [draggingCats, setDraggingCats] = useState(false);
+
+  const moveCat = (from: string, to: string) => {
+    const arr = [...cats];
+    const fi = arr.indexOf(from), ti = arr.indexOf(to);
+    if (fi < 0 || ti < 0 || fi === ti) return;
+    arr.splice(fi, 1); arr.splice(ti, 0, from);
+    setCats(arr); saveCats(arr);
+  };
+
   const load = () => adminPost("pricelist_custom").then(d => { setItems(d.items || []); setLoading(false); });
   useEffect(() => { load(); }, []);
 
@@ -4164,33 +4227,65 @@ function AdminPricelistEditor() {
       )}
 
       {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
-      {Object.entries(grouped).map(([cat, catItems]) => (
-        <div key={cat} className="mb-4">
-          <div className="px-3 py-1.5 rounded-xl mb-2 text-xs font-bold tracking-wide" style={{ ...GRAD, color: "white" }}>{cat}</div>
-          <div className="space-y-2">
-            {catItems.map(item => (
-              <div key={item.id} className="card-glow rounded-2xl p-3" style={!item.is_active ? { opacity: 0.5 } : {}}>
-                <div className="flex items-start gap-3">
-                  {item.photo_url && <img src={item.photo_url} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={item.name} onError={e => (e.currentTarget.style.display = "none")} />}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm" style={P}>{item.name}</div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {item.price && <span className="text-xs font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.price}</span>}
-                      {item.duration && <span className="text-xs" style={PS}>{item.duration}</span>}
+
+      {/* Подсказка drag & drop */}
+      {!loading && items.length > 0 && !adding && !editing && (
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <span className="text-[11px]" style={PS}>Зажми заголовок категории чтобы переместить</span>
+          {draggingCats && <span className="text-[11px] font-semibold" style={{ color: "hsl(335 70% 50%)" }}>· режим перестановки</span>}
+        </div>
+      )}
+
+      {/* Категории в порядке из cats, потом остальные */}
+      {[...cats.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !cats.includes(c))].map(cat => {
+        const catItems = grouped[cat] || [];
+        const isDragOver = dragOverCat === cat && dragCat !== cat;
+        return (
+          <div key={cat} className="mb-4"
+            onDragOver={e => { e.preventDefault(); setDragOverCat(cat); }}
+            onDrop={() => { if (dragCat && dragCat !== cat) { moveCat(dragCat, cat); } setDragCat(null); setDragOverCat(null); }}
+            style={isDragOver ? { transform: "scale(1.01)", transition: "transform 0.15s" } : {}}>
+            {/* Заголовок категории — drag handle */}
+            <div
+              draggable
+              onDragStart={() => setDragCat(cat)}
+              onDragEnd={() => { setDragCat(null); setDragOverCat(null); setDraggingCats(false); }}
+              onTouchStart={() => { longPressTimer.current = setTimeout(() => { setDragCat(cat); setDraggingCats(true); }, 500); }}
+              onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+              className="px-3 py-2 rounded-xl mb-2 text-xs font-bold tracking-wide flex items-center justify-between select-none cursor-grab active:cursor-grabbing"
+              style={dragCat === cat
+                ? { background: "hsl(335 50% 70%)", color: "white", opacity: 0.7 }
+                : isDragOver
+                  ? { background: "hsl(335 80% 50%)", color: "white" }
+                  : { ...GRAD, color: "white" }}>
+              <span>{cat}</span>
+              <span className="text-white/60 text-base">⠿</span>
+            </div>
+            <div className="space-y-2">
+              {catItems.map(item => (
+                <div key={item.id} className="card-glow rounded-2xl p-3" style={!item.is_active ? { opacity: 0.5 } : {}}>
+                  <div className="flex items-start gap-3">
+                    {item.photo_url && <img src={item.photo_url} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={item.name} onError={e => (e.currentTarget.style.display = "none")} />}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm" style={P}>{item.name}</div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {item.price && <span className="text-xs font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.price}</span>}
+                        {item.duration && <span className="text-xs" style={PS}>{item.duration}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1 flex-shrink-0">
+                      <button onClick={() => startEdit(item)} className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>✏️</button>
+                      <button onClick={() => toggle(item.id)} className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                        {item.is_active ? "Скрыть" : "Показать"}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1 flex-shrink-0">
-                    <button onClick={() => startEdit(item)} className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>✏️</button>
-                    <button onClick={() => toggle(item.id)} className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
-                      {item.is_active ? "Скрыть" : "Показать"}
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {!loading && items.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Услуг пока нет — добавьте первую!</div>}
 
       {items.length > 0 && (
@@ -6684,7 +6779,6 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const cartCount = getCart().reduce((s: number, i: any) => s + (i.quantity || 1), 0);
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
-    { id: "gallery", icon: "Images", label: "Галерея" },
     { id: "shop", icon: "ShoppingBag", label: "Магазин" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
