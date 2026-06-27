@@ -608,7 +608,7 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-oswald font-semibold" style={{ color: "hsl(335 60% 30%)" }}>Наши мастера</h2>
-          <button onClick={() => setPage("masters")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>Все →</button>
+          <button onClick={() => navigateTo("masters")} className="text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>Все →</button>
         </div>
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
           {masters.map((m) => (
@@ -676,7 +676,7 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
             // Индивидуальная высота карточки или глобальная из настроек
             const h = Number(siteSettings[item.hKey] || siteSettings.section_card_height || 140);
             return (
-              <button key={item.page} onClick={() => setPage(item.page)}
+              <button key={item.page} onClick={() => navigateTo(item.page)}
                 className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
                 {img ? (
                   <div className="relative" style={{ height: h }}>
