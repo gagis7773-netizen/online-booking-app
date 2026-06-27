@@ -304,28 +304,32 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
               </div>
 
               <div>
-                <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Услуга</label>
-                <select value={service} onChange={e => setService(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl outline-none text-sm"
-                  style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }}>
-                  {SERVICES.map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
-
-              <div>
                 <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Отзыв *</label>
-                <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Поделитесь впечатлением..." rows={4}
+                <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Поделитесь впечатлением..." rows={5}
                   className="w-full px-4 py-3 rounded-xl outline-none text-sm resize-none"
                   style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
               </div>
 
+              {/* Прикрепить фото из галереи */}
               <div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+                <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
                 <button onClick={() => fileRef.current?.click()}
-                  className="w-full py-2.5 rounded-xl text-sm font-medium"
-                  style={{ background: "hsl(335 30% 96%)", color: "hsl(335 50% 50%)", border: `1px dashed ${pinkBorder}` }}>
-                  {photo ? `📷 ${photo.name}` : "📷 Добавить фото (необязательно)"}
+                  className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                  style={photo
+                    ? { background: "hsl(142 50% 94%)", color: "hsl(142 55% 35%)", border: "1.5px solid hsl(142 50% 78%)" }
+                    : { background: "hsl(335 30% 96%)", color: "hsl(335 50% 50%)", border: `1.5px dashed ${pinkBorder}` }}>
+                  <span style={{ fontSize: 18 }}>📷</span>
+                  {photo ? `✓ ${photo.name}` : "Прикрепить фото из галереи"}
                 </button>
+                {photo && (
+                  <div className="mt-2 relative">
+                    <img src={`data:image/jpeg;base64,${photo.data}`} alt="preview"
+                      className="w-full h-40 object-cover rounded-xl" />
+                    <button onClick={() => setPhoto(null)}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold"
+                      style={{ background: "rgba(0,0,0,0.5)", color: "white" }}>✕</button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
