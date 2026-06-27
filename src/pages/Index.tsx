@@ -4,6 +4,43 @@ import Icon from "@/components/ui/icon";
 import ReviewsPage from "./ReviewsPage";
 import ChatPage from "./ChatPage";
 
+// ── Звуковые уведомления ──
+const SOUND_PRESETS: Record<string, { label: string; freq: number[]; type: OscillatorType }> = {
+  bell: { label: "Колокольчик 🔔", freq: [880, 1100, 880], type: "sine" },
+  pop: { label: "Поп 💬", freq: [600, 900], type: "sine" },
+  chime: { label: "Перезвон ✨", freq: [523, 659, 784, 1046], type: "triangle" },
+  ding: { label: "Динь 🎵", freq: [1047], type: "sine" },
+  soft: { label: "Тихий 🎶", freq: [440, 554], type: "sine" },
+};
+
+function playNotificationSound(preset = "bell", volume = 0.5) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const p = SOUND_PRESETS[preset] || SOUND_PRESETS.bell;
+    p.freq.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = p.type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(volume * 0.3, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.3);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.35);
+    });
+  } catch { /* AudioContext не доступен */ }
+}
+
+function getSoundSettings() {
+  try {
+    return JSON.parse(localStorage.getItem("gp_sound_settings") || "{}");
+  } catch { return {}; }
+}
+function saveSoundSettings(s: Record<string, any>) {
+  localStorage.setItem("gp_sound_settings", JSON.stringify(s));
+}
+
 const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/11e394f0-e373-4e52-bea5-7b8a5ce187c2.png";
 const QR_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
 const SALON_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/890adaa5-bbaa-4546-9c4e-2406379ded6a.jpg";
@@ -42,24 +79,50 @@ async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
 }
 
 // Минималистичная кнопка загрузки фото для разделов (без useState)
-function SectionPhotoUpload({ settingKey, set }: { settingKey: string; set: (k: string, v: string) => void }) {
+// SectionPhotoUpload — загружает фото и сохраняет в БД без ре-рендера родителя
+function SectionPhotoUpload({
+  settingKey,
+  currentUrl,
+  onSaved,
+}: {
+  settingKey: string;
+  currentUrl?: string;
+  onSaved: (key: string, url: string) => void;
+}) {
   const [upl, setUpl] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const [localUrl, setLocalUrl] = React.useState(currentUrl || "");
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUpl(true);
+    setDone(false);
+    try {
+      const url = await uploadPhoto(file, "sections");
+      // Сохраняем прямо в БД — без вызова setSettings родителя
+      await adminPost("site_settings", { action: "save", settings: { [settingKey]: url } });
+      setLocalUrl(url);
+      onSaved(settingKey, url); // обновляем локально в родителе без сброса страницы
+      setDone(true);
+      setTimeout(() => setDone(false), 2000);
+    } catch { alert("Ошибка загрузки, попробуй ещё раз"); }
+    finally { setUpl(false); e.target.value = ""; }
+  };
+
   return (
-    <label className="cursor-pointer flex-1 py-2 px-3 rounded-xl text-xs font-medium text-center"
-      style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px dashed hsl(335 50% 80%)" }}>
-      {upl ? "Загружаем..." : "📷 Загрузить фото"}
-      <input type="file" accept="image/*" className="hidden" disabled={upl}
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setUpl(true);
-          try {
-            const url = await uploadPhoto(file, "sections");
-            set(settingKey, url);
-          } catch { alert("Ошибка загрузки"); }
-          finally { setUpl(false); e.target.value = ""; }
-        }} />
-    </label>
+    <div className="space-y-2">
+      <label className="cursor-pointer flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-medium w-full"
+        style={{ background: done ? "hsl(142 60% 94%)" : "hsl(335 50% 96%)", color: done ? "hsl(142 60% 35%)" : "hsl(335 60% 45%)", border: `1.5px dashed ${done ? "hsl(142 50% 75%)" : "hsl(335 50% 80%)"}` }}>
+        {upl ? "⏳ Загружаем..." : done ? "✅ Сохранено!" : "📷 Загрузить фото"}
+        <input type="file" accept="image/*" className="hidden" disabled={upl} onChange={handleFile} />
+      </label>
+      {localUrl && (
+        <div className="relative">
+          <img src={localUrl} className="w-full h-20 object-cover rounded-xl" alt="preview" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1465,14 +1528,23 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
-          {/* Кнопка записать клиента */}
-          <button
-            onClick={() => setSection("schedule")}
-            className="w-full py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-base mb-4"
-            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 20px hsl(335 80% 65% / 0.4)" }}>
-            <Icon name="CalendarPlus" size={20} className="text-white" />
-            Записать клиента
-          </button>
+          {/* Кнопки главных действий */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <button
+              onClick={() => setSection("schedule")}
+              className="py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-sm"
+              style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 16px hsl(335 80% 65% / 0.4)" }}>
+              <Icon name="CalendarPlus" size={18} className="text-white" />
+              Записать клиента
+            </button>
+            <button
+              onClick={() => setSection("messages")}
+              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm relative"
+              style={{ background: "white", color: "hsl(335 70% 45%)", border: "2px solid hsl(335 70% 78%)", boxShadow: "0 4px 16px hsl(335 50% 85% / 0.5)" }}>
+              <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 70% 45%)" }} />
+              Сообщения
+            </button>
+          </div>
 
           {/* Краткая сводка на главной */}
           {isOwner && stats && (
@@ -1519,6 +1591,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "clients" && <AdminClients />}
       {section === "schedule" && <AdminSchedule />}
+      {section === "messages" && <AdminMessages />}
       {section === "notifications" && isOwner && <AdminNotificationsHub />}
       {/* Финансы = расходы + доходы + сводка + статистика */}
       {section === "expenses" && isOwner && <AdminFinanceHub />}
@@ -2717,9 +2790,32 @@ function AdminSchedule() {
 function AdminMessages() {
   const [chats, setChats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevCount = React.useRef<number>(0);
+
+  const load = () => {
+    adminPost("messages").then(d => {
+      const newChats = d.chats || [];
+      // Звук при новых сообщениях
+      if (!loading && newChats.length > 0) {
+        const totalNew = newChats.reduce((s: number, c: any) => s + (c.msg_count || 0), 0);
+        if (totalNew > prevCount.current) {
+          const ss = getSoundSettings();
+          if (ss.enabled !== false) {
+            playNotificationSound(ss.preset || "bell", Number(ss.volume ?? 0.5));
+          }
+        }
+        prevCount.current = totalNew;
+      }
+      setChats(newChats);
+      setLoading(false);
+    });
+  };
 
   useEffect(() => {
-    adminPost("messages").then(d => { setChats(d.chats || []); setLoading(false); });
+    load();
+    // Поллинг каждые 15 секунд
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -4204,17 +4300,42 @@ function AdminSiteSettings() {
       {/* Цвет главного экрана */}
       <div className="card-glow rounded-2xl p-4">
         <div className="font-semibold text-sm mb-3" style={P}>Цвет главного экрана</div>
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="grid grid-cols-4 gap-2 mb-3">
           {COLORS.map(c => (
             <button key={c} onClick={() => { set("hero_color_from", c); set("hero_color_to", c); }}
               className="h-10 rounded-xl border-2 transition-all"
               style={{ background: c, borderColor: settings.hero_color_from === c ? "hsl(335 80% 40%)" : "transparent" }} />
           ))}
+          {/* Свой цвет — color picker */}
+          <label className="h-10 rounded-xl border-2 cursor-pointer overflow-hidden relative transition-all flex items-center justify-center"
+            title="Выбрать свой цвет"
+            style={{
+              background: settings.hero_color_from && !COLORS.includes(settings.hero_color_from)
+                ? settings.hero_color_from : "linear-gradient(135deg,#f0f,#ff0,#0ff,#f0f)",
+              borderColor: settings.hero_color_from && !COLORS.includes(settings.hero_color_from)
+                ? "hsl(335 80% 40%)" : "transparent"
+            }}>
+            <span className="text-white text-[11px] font-bold drop-shadow z-10">+</span>
+            <input type="color" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              value={settings.hero_color_from && settings.hero_color_from.startsWith("#")
+                ? settings.hero_color_from : "#e91e8c"}
+              onChange={e => { set("hero_color_from", e.target.value); set("hero_color_to", e.target.value); }} />
+          </label>
         </div>
-        <div>
-          <label className="text-xs block mb-1" style={PS}>Цвет кнопок (HEX или hsl)</label>
-          <input value={settings.hero_color_from || ""} onChange={e => set("hero_color_from", e.target.value)}
-            placeholder="hsl(335 80% 58%)" className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={inp} />
+        {/* Превью цвета */}
+        <div className="h-8 rounded-xl mb-3 transition-all"
+          style={{ background: `linear-gradient(135deg, ${settings.hero_color_from || "hsl(335 80% 58%)"}, ${settings.hero_color_to || "hsl(315 70% 65%)"})` }} />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Цвет начала</label>
+            <input value={settings.hero_color_from || ""} onChange={e => set("hero_color_from", e.target.value)}
+              placeholder="hsl(335 80% 58%)" className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Цвет конца</label>
+            <input value={settings.hero_color_to || ""} onChange={e => set("hero_color_to", e.target.value)}
+              placeholder="hsl(315 70% 65%)" className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={inp} />
+          </div>
         </div>
       </div>
 
@@ -4280,7 +4401,7 @@ function AdminSiteSettings() {
       {/* Фото разделов */}
       <div className="card-glow rounded-2xl p-4 space-y-4">
         <div className="font-semibold text-sm" style={P}>Фото разделов</div>
-        <p className="text-xs" style={PS}>Фото вместо иконок в блоке «Разделы» на главной</p>
+        <p className="text-xs" style={PS}>Фото вместо иконок в блоке «Разделы» на главной. После загрузки сохраняется автоматически.</p>
         {[
           { key: "section_pricelist_img", label: "Прайс-лист", hKey: "section_pricelist_h" },
           { key: "section_gallery_img", label: "Галерея", hKey: "section_gallery_h" },
@@ -4289,29 +4410,30 @@ function AdminSiteSettings() {
         ].map(f => (
           <div key={f.key} className="rounded-xl p-3 space-y-2" style={{ background: "hsl(335 50% 98%)", border: "1px solid hsl(335 40% 92%)" }}>
             <div className="text-xs font-semibold" style={P}>{f.label}</div>
-            <SectionPhotoUpload settingKey={f.key} set={set} />
+            {/* Новый SectionPhotoUpload — сохраняет в БД сам, не вызывает ре-рендер */}
+            <SectionPhotoUpload
+              settingKey={f.key}
+              currentUrl={settings[f.key]}
+              onSaved={(key, url) => setSettings(prev => ({ ...prev, [key]: url }))}
+            />
             {settings[f.key] && (
-              <>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs" style={PS}>Высота карточки</span>
-                    <span className="text-xs font-medium" style={P}>{settings[f.hKey] || "96"}px</span>
-                  </div>
-                  <input type="range" min="60" max="200" step="4"
-                    value={settings[f.hKey] || "96"}
-                    onChange={e => set(f.hKey, e.target.value)}
-                    className="w-full accent-pink-500" />
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs" style={PS}>Высота карточки</span>
+                  <span className="text-xs font-medium" style={P}>{settings[f.hKey] || "96"}px</span>
                 </div>
-                <div className="overflow-hidden rounded-lg" style={{ height: Number(settings[f.hKey] || 96) }}>
-                  <img src={settings[f.key]} className="w-full h-full object-cover" alt={f.label} />
-                </div>
-              </>
+                <input type="range" min="60" max="200" step="4"
+                  value={settings[f.hKey] || "96"}
+                  onChange={e => set(f.hKey, e.target.value)}
+                  className="w-full accent-pink-500" />
+              </div>
             )}
           </div>
         ))}
+        {/* Кнопка для сохранения высот карточек */}
         <button onClick={saveAll} disabled={saving}
           className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
-          {saving ? "Сохраняем..." : "💾 Сохранить фото разделов"}
+          {saving ? "Сохраняем..." : "💾 Сохранить высоты карточек"}
         </button>
       </div>
 
@@ -4555,8 +4677,15 @@ function AdminSettingsHub({ currentStaffId }: { currentStaffId: number }) {
 function AdminSettings() {
   const SITE_URL = window.location.href;
   const [copied, setCopied] = useState(false);
-  const [adminSection, setAdminSection] = useState<"main" | "profile" | "schedule">("main");
+  const [adminSection, setAdminSection] = useState<"main" | "profile" | "schedule" | "sounds">("main");
   const session = loadAdminSession();
+  const [soundSettings, setSoundSettings] = useState(() => getSoundSettings());
+
+  const updateSound = (key: string, val: any) => {
+    const updated = { ...soundSettings, [key]: val };
+    setSoundSettings(updated);
+    saveSoundSettings(updated);
+  };
 
   const copy = () => {
     navigator.clipboard.writeText(SITE_URL);
@@ -4587,6 +4716,72 @@ function AdminSettings() {
     </div>
   );
 
+  if (adminSection === "sounds") return (
+    <div className="px-4 pb-6">
+      <button onClick={() => setAdminSection("main")} className="flex items-center gap-2 text-sm mb-5" style={PS}>
+        <Icon name="ChevronLeft" size={16} /> Назад
+      </button>
+      <h2 className="text-lg font-oswald font-semibold mb-4" style={P}>Звуковые уведомления</h2>
+
+      {/* Включить/выключить */}
+      <div className="card-glow rounded-2xl p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-sm" style={P}>Звук при новых сообщениях</div>
+            <div className="text-xs mt-0.5" style={PS}>Сигнал когда клиент написал</div>
+          </div>
+          <button
+            onClick={() => updateSound("enabled", soundSettings.enabled === false ? true : false)}
+            className="w-12 h-6 rounded-full transition-all relative flex-shrink-0"
+            style={{ background: soundSettings.enabled === false ? "hsl(335 20% 85%)" : "hsl(335 80% 58%)" }}>
+            <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+              style={{ left: soundSettings.enabled === false ? 2 : 26 }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Громкость */}
+      <div className="card-glow rounded-2xl p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-semibold text-sm" style={P}>Громкость</div>
+          <span className="text-sm font-bold" style={{ color: "hsl(335 80% 55%)" }}>
+            {Math.round((soundSettings.volume ?? 0.5) * 100)}%
+          </span>
+        </div>
+        <input type="range" min="0" max="1" step="0.05"
+          value={soundSettings.volume ?? 0.5}
+          onChange={e => updateSound("volume", parseFloat(e.target.value))}
+          className="w-full accent-pink-500" />
+      </div>
+
+      {/* Выбор мелодии */}
+      <div className="card-glow rounded-2xl p-4 mb-4">
+        <div className="font-semibold text-sm mb-3" style={P}>Мелодия сигнала</div>
+        <div className="space-y-2">
+          {Object.entries(SOUND_PRESETS).map(([key, preset]) => (
+            <button key={key}
+              onClick={() => { updateSound("preset", key); playNotificationSound(key, soundSettings.volume ?? 0.5); }}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all"
+              style={(soundSettings.preset || "bell") === key
+                ? { ...GRAD, color: "white" }
+                : { background: "hsl(335 20% 95%)", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 30% 88%)" }}>
+              <span className="text-sm font-medium">{preset.label}</span>
+              <Icon name="Play" size={14} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Тест */}
+      <button
+        onClick={() => playNotificationSound(soundSettings.preset || "bell", soundSettings.volume ?? 0.5)}
+        className="w-full py-3 rounded-2xl font-semibold text-white"
+        style={GRAD}>
+        🔔 Проверить звук
+      </button>
+    </div>
+  );
+
   return (
     <div className="px-4 pb-6 space-y-3">
       {/* Профиль */}
@@ -4612,6 +4807,22 @@ function AdminSettings() {
         <div className="flex-1">
           <div className="font-semibold text-sm" style={P}>Рабочее расписание</div>
           <div className="text-xs" style={PS}>Дни работы и часы →</div>
+        </div>
+        <Icon name="ChevronRight" size={18} style={PS} />
+      </button>
+
+      {/* Звуковые уведомления */}
+      <button onClick={() => setAdminSection("sounds")}
+        className="w-full card-glow rounded-2xl p-4 flex items-center gap-3 text-left hover:scale-[1.01] transition-all">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(45 90% 92%)" }}>
+          <Icon name="Bell" size={18} style={{ color: "hsl(45 80% 40%)" }} />
+        </div>
+        <div className="flex-1">
+          <div className="font-semibold text-sm" style={P}>Звуковые уведомления</div>
+          <div className="text-xs" style={PS}>
+            {soundSettings.enabled === false ? "🔇 Выключены" : `🔔 Вкл · ${SOUND_PRESETS[soundSettings.preset || "bell"]?.label || "Колокольчик"}`}
+          </div>
         </div>
         <Icon name="ChevronRight" size={18} style={PS} />
       </button>
