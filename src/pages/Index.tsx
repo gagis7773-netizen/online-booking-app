@@ -41,6 +41,28 @@ async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
   });
 }
 
+// Минималистичная кнопка загрузки фото для разделов (без useState)
+function SectionPhotoUpload({ settingKey, set }: { settingKey: string; set: (k: string, v: string) => void }) {
+  const [upl, setUpl] = React.useState(false);
+  return (
+    <label className="cursor-pointer flex-1 py-2 px-3 rounded-xl text-xs font-medium text-center"
+      style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px dashed hsl(335 50% 80%)" }}>
+      {upl ? "Загружаем..." : "📷 Загрузить фото"}
+      <input type="file" accept="image/*" className="hidden" disabled={upl}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setUpl(true);
+          try {
+            const url = await uploadPhoto(file, "sections");
+            set(settingKey, url);
+          } catch { alert("Ошибка загрузки"); }
+          finally { setUpl(false); e.target.value = ""; }
+        }} />
+    </label>
+  );
+}
+
 // Переиспользуемая кнопка загрузки фото
 function PhotoUploadButton({
   onUploaded, folder = "uploads", label = "📷 Загрузить фото", className = "", uploading, setUploading
@@ -356,22 +378,35 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         </div>
       </div>
 
-      {/* Фото нашего салона */}
+      {/* Фото нашего салона — кликабельное, открывается на весь экран */}
       <div className="px-4 mb-5">
-        <div className="relative rounded-3xl overflow-hidden shadow-xl" style={{ height: 220 }}>
-          <img
-            src={wallImg}
-            alt={wallTitle}
-            className="w-full h-full object-cover object-center"
-          />
+        <button className="w-full relative rounded-3xl overflow-hidden shadow-xl text-left"
+          style={{ height: 220 }}
+          onClick={() => {
+            const fs = document.createElement("div");
+            fs.style.cssText = "position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer";
+            const img = document.createElement("img");
+            img.src = wallImg;
+            img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;border-radius:12px";
+            const close = document.createElement("button");
+            close.innerHTML = "✕";
+            close.style.cssText = "position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);color:white;font-size:18px;border:none;cursor:pointer;font-weight:bold";
+            fs.appendChild(img); fs.appendChild(close);
+            fs.onclick = () => document.body.removeChild(fs);
+            document.body.appendChild(fs);
+          }}>
+          <img src={wallImg} alt={wallTitle} className="w-full h-full object-cover object-center" />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(255,235,242,0.82) 100%)" }} />
+          <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-[10px] flex items-center gap-1"
+            style={{ background: "rgba(255,255,255,0.85)", color: "hsl(335 60% 40%)" }}>
+            <Icon name="ZoomIn" size={10} /> увеличить
+          </div>
           <div className="absolute bottom-3 left-4 right-4">
             <p className="text-base font-bold font-oswald" style={{ color: "hsl(335 60% 25%)", textShadow: "0 1px 4px rgba(255,255,255,0.7)" }}>{wallTitle}</p>
             <p className="text-xs mt-0.5" style={{ color: "hsl(335 40% 50%)" }}>{wallSubtitle}</p>
           </div>
-          {/* Рамка */}
           <div className="absolute inset-1 rounded-2xl pointer-events-none" style={{ border: "1.5px solid rgba(255,255,255,0.45)" }} />
-        </div>
+        </button>
       </div>
 
       {/* Разделы */}
@@ -379,21 +414,37 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList" },
-            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images" },
-            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star" },
-            { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText" },
-          ].map(item => (
-            <button key={item.page} onClick={() => setPage(item.page)}
-              className="card-glow rounded-2xl p-4 text-left hover:scale-105 transition-all">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
-                style={{ background: "hsl(335 80% 60% / 0.1)", border: "1px solid hsl(335 70% 85%)" }}>
-                <Icon name={item.icon as any} size={18} style={{ color: "hsl(335 75% 52%)" }} />
-              </div>
-              <div className="font-semibold text-sm mb-0.5" style={{ color: "hsl(335 50% 30%)" }}>{item.label}</div>
-              <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{item.sub}</div>
-            </button>
-          ))}
+            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img" },
+            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img" },
+            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img" },
+            { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img" },
+          ].map(item => {
+            const img = siteSettings[item.imgKey];
+            return (
+              <button key={item.page} onClick={() => setPage(item.page)}
+                className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
+                {img ? (
+                  <div className="relative h-24">
+                    <img src={img} alt={item.label} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 30%, rgba(255,235,242,0.92) 100%)" }} />
+                    <div className="absolute bottom-2 left-3">
+                      <div className="font-semibold text-xs" style={{ color: "hsl(335 50% 28%)" }}>{item.label}</div>
+                      <div className="text-[10px]" style={{ color: "hsl(335 30% 55%)" }}>{item.sub}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
+                      style={{ background: "hsl(335 80% 60% / 0.1)", border: "1px solid hsl(335 70% 85%)" }}>
+                      <Icon name={item.icon as any} size={18} style={{ color: "hsl(335 75% 52%)" }} />
+                    </div>
+                    <div className="font-semibold text-sm mb-0.5" style={{ color: "hsl(335 50% 30%)" }}>{item.label}</div>
+                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{item.sub}</div>
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1374,18 +1425,15 @@ function AdminPage({ onBack }: { onBack: () => void }) {
   const menuItems: { id: AdminSection; icon: string; label: string; color: string; ownerOnly?: boolean }[] = [
     { id: "schedule", icon: "CalendarDays", label: "Расписание", color: "from-blue-500 to-indigo-500" },
     { id: "clients", icon: "Users", label: "Клиенты", color: "from-purple-500 to-pink-500" },
-    { id: "analytics", icon: "BarChart3", label: "Статистика", color: "from-pink-500 to-fuchsia-500", ownerOnly: true },
     { id: "messages", icon: "MessageCircle", label: "Сообщения", color: "from-teal-500 to-cyan-500" },
+    { id: "analytics", icon: "BarChart3", label: "Статистика", color: "from-pink-500 to-fuchsia-500", ownerOnly: true },
     { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500", ownerOnly: true },
     { id: "expenses", icon: "Wallet", label: "Финансы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
-    { id: "masters_edit", icon: "UserCircle", label: "Мастера", color: "from-rose-400 to-pink-500", ownerOnly: true },
-    { id: "broadcast", icon: "Send", label: "Рассылка", color: "from-sky-500 to-blue-500", ownerOnly: true },
-    { id: "templates", icon: "MessageSquare", label: "Шаблоны SMS", color: "from-lime-500 to-green-500", ownerOnly: true },
+    { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "site_settings", icon: "Paintbrush", label: "Оформление", color: "from-fuchsia-500 to-pink-500", ownerOnly: true },
     { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
-    { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
   ];
 
@@ -1412,14 +1460,23 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
-          {/* Кнопка записать клиента — всегда видна */}
-          <button
-            onClick={() => setSection("schedule")}
-            className="w-full py-4 rounded-2xl font-bold text-white shadow-lg mb-4 flex items-center justify-center gap-2 text-base"
-            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 20px hsl(335 80% 65% / 0.4)" }}>
-            <Icon name="CalendarPlus" size={20} className="text-white" />
-            Записать клиента
-          </button>
+          {/* Главные кнопки действий */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <button
+              onClick={() => setSection("schedule")}
+              className="py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-sm"
+              style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 16px hsl(335 80% 65% / 0.35)" }}>
+              <Icon name="CalendarPlus" size={18} className="text-white" />
+              Записать клиента
+            </button>
+            <button
+              onClick={() => setSection("messages")}
+              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm"
+              style={{ background: "white", color: "hsl(335 70% 45%)", border: "2px solid hsl(335 70% 78%)", boxShadow: "0 4px 16px hsl(335 50% 85% / 0.5)" }}>
+              <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 70% 45%)" }} />
+              Сообщения
+            </button>
+          </div>
 
           {/* Краткая сводка на главной */}
           {isOwner && stats && (
@@ -1468,16 +1525,15 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "schedule" && <AdminSchedule />}
       {section === "analytics" && isOwner && <AdminAnalytics />}
       {section === "messages" && <AdminMessages />}
-      {section === "notifications" && isOwner && <AdminNotifications />}
+      {/* Уведомления теперь включает рассылку, шаблоны и push */}
+      {section === "notifications" && isOwner && <AdminNotificationsHub />}
       {section === "expenses" && isOwner && <AdminExpenses />}
       {section === "gallery" && <AdminGalleryFolders />}
       {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
-      {section === "masters_edit" && isOwner && <AdminMastersEditor />}
-      {section === "broadcast" && isOwner && <AdminBroadcast />}
-      {section === "templates" && isOwner && <AdminNotificationTemplates />}
+      {/* Мастера теперь в Сотрудниках */}
+      {section === "staff" && isOwner && <AdminStaffHub currentStaffId={adminUser.id} />}
       {section === "site_settings" && isOwner && <AdminSiteSettings />}
       {section === "documents" && isOwner && <AdminDocuments />}
-      {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
       {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
     </div>
@@ -2237,86 +2293,329 @@ function AdminClients() {
   );
 }
 
-// ── Расписание ──
+// ── Расписание (с календарём) ──
 function AdminSchedule() {
+  const [tab, setTab] = useState<"calendar" | "list" | "workhours">("calendar");
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "" });
   const [saving, setSaving] = useState(false);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Рабочее расписание и выходные
+  const [workDays, setWorkDays] = useState<any[]>([]);
+  const [daysOff, setDaysOff] = useState<number[]>([]); // 0=Пн..6=Вс
+  const [savingWork, setSavingWork] = useState(false);
+  const [savedWork, setSavedWork] = useState(false);
 
   const load = () => adminPost("schedule").then(d => { setItems(d.schedule || []); setLoading(false); });
-  useEffect(() => { load(); }, []);
+  const loadWork = () => {
+    adminPost("work_schedule").then(d => {
+      const sorted = (d.days || []).sort((a: any, b: any) => ((a.day_of_week + 6) % 7) - ((b.day_of_week + 6) % 7));
+      setWorkDays(sorted);
+    });
+    adminPost("site_settings").then(d => {
+      const off = JSON.parse((d.settings || {}).days_off || "[]");
+      setDaysOff(off);
+    });
+  };
+  useEffect(() => { load(); loadWork(); }, []);
 
   const save = async () => {
     if (!form.client_name || !form.booking_date || !form.booking_time) return;
     setSaving(true);
     await adminPost("schedule", { action: "add", ...form });
     setForm({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "" });
-    setAdding(false);
-    setSaving(false);
-    load();
+    setAdding(false); setSaving(false); load();
+  };
+  const del = async (id: number) => { await adminPost("schedule", { action: "delete", id }); load(); };
+
+  const saveWorkHours = async () => {
+    setSavingWork(true);
+    await adminPost("work_schedule", { action: "save", days: workDays });
+    await adminPost("site_settings", { action: "save", settings: { days_off: JSON.stringify(daysOff) } });
+    setSavingWork(false); setSavedWork(true); setTimeout(() => setSavedWork(false), 2000);
   };
 
-  const del = async (id: number) => {
-    await adminPost("schedule", { action: "delete", id });
-    load();
+  const toggleDayOff = (idx: number) => {
+    setDaysOff(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx]);
   };
 
-  const inputStyle = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+  const DAY_NAMES_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const DAY_NAMES_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+  const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  // Строим данные месяца
+  const firstDay = new Date(calYear, calMonth, 1);
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  // Понедельник = 0 для сетки
+  const startOffset = (firstDay.getDay() + 6) % 7;
+
+  const formatDate = (y: number, m: number, d: number) => `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+  // Записи по датам
+  const itemsByDate: Record<string, any[]> = {};
+  items.forEach(it => {
+    const d = it.booking_date?.slice(0,10);
+    if (d) { if (!itemsByDate[d]) itemsByDate[d] = []; itemsByDate[d].push(it); }
+  });
+
+  const dayOfWeekForDate = (y: number, m: number, d: number) => (new Date(y, m, d).getDay() + 6) % 7; // 0=Пн
+
+  const todayStr = formatDate(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const selectedItems = selectedDate ? (itemsByDate[selectedDate] || []) : [];
 
   return (
-    <div className="px-4 pb-6">
-      <button onClick={() => setAdding(!adding)}
-        className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm"
-        style={GRAD}>
-        {adding ? "✕ Отмена" : "+ Добавить запись"}
-      </button>
-
-      {adding && (
-        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
-          {[
-            { key: "client_name", label: "Имя клиента", ph: "Имя" },
-            { key: "client_phone", label: "Телефон", ph: "+7..." },
-            { key: "services", label: "Услуги", ph: "Криолиполиз, СМАС..." },
-            { key: "booking_date", label: "Дата", ph: "2026-07-15" },
-            { key: "booking_time", label: "Время", ph: "14:00" },
-            { key: "notes", label: "Примечание", ph: "Необязательно" },
-          ].map(f => (
-            <div key={f.key}>
-              <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
-              <input value={(form as any)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
-            </div>
+    <div className="pb-6">
+      {/* Вкладки */}
+      <div className="px-4 mb-4">
+        <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+          {([
+            { id: "calendar", label: "Календарь" },
+            { id: "list", label: "Список" },
+            { id: "workhours", label: "Часы работы" },
+          ] as const).map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex-1 py-2.5 text-xs font-semibold transition-all"
+              style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+              {t.label}
+            </button>
           ))}
-          <button onClick={save} disabled={saving}
-            className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
-            {saving ? "Сохраняем..." : "Сохранить"}
+        </div>
+      </div>
+
+      {/* ─── КАЛЕНДАРЬ ─── */}
+      {tab === "calendar" && (
+        <div className="px-4">
+          {/* Навигация по месяцам */}
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+              <Icon name="ChevronLeft" size={16} style={{ color: "hsl(335 60% 40%)" }} />
+            </button>
+            <span className="font-oswald font-bold text-base" style={P}>{MONTH_NAMES[calMonth]} {calYear}</span>
+            <button onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+              <Icon name="ChevronRight" size={16} style={{ color: "hsl(335 60% 40%)" }} />
+            </button>
+          </div>
+
+          {/* Заголовки дней */}
+          <div className="grid grid-cols-7 mb-1">
+            {DAY_NAMES_SHORT.map((d, i) => (
+              <div key={d} className="text-center text-[10px] font-semibold py-1"
+                style={{ color: daysOff.includes(i) ? "hsl(0 60% 60%)" : "hsl(335 40% 55%)" }}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Сетка дней */}
+          <div className="grid grid-cols-7 gap-0.5 mb-4">
+            {Array.from({ length: startOffset }).map((_, i) => <div key={`e${i}`} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = formatDate(calYear, calMonth, day);
+              const dow = dayOfWeekForDate(calYear, calMonth, day);
+              const isOff = daysOff.includes(dow);
+              const bookings = itemsByDate[dateStr] || [];
+              const isToday = dateStr === todayStr;
+              const isSelected = dateStr === selectedDate;
+              return (
+                <button key={day} onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                  className="relative flex flex-col items-center justify-start py-1.5 rounded-xl transition-all min-h-[44px]"
+                  style={isSelected
+                    ? { ...GRAD, color: "white" }
+                    : isToday
+                      ? { background: "hsl(335 80% 60% / 0.15)", border: "1.5px solid hsl(335 80% 65%)" }
+                      : isOff
+                        ? { background: "hsl(0 40% 97%)" }
+                        : { background: "hsl(335 50% 98%)" }}>
+                  <span className="text-xs font-bold" style={isSelected ? { color: "white" } : isOff ? { color: "hsl(0 50% 70%)" } : P}>
+                    {day}
+                  </span>
+                  {bookings.length > 0 && (
+                    <span className="text-[9px] font-bold mt-0.5 px-1 rounded-full"
+                      style={isSelected
+                        ? { background: "rgba(255,255,255,0.3)", color: "white" }
+                        : { background: "hsl(335 80% 58%)", color: "white" }}>
+                      {bookings.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Кнопка добавить */}
+          <button onClick={() => {
+            if (selectedDate) setForm(f => ({ ...f, booking_date: selectedDate }));
+            setAdding(true);
+            setTab("list");
+          }} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+            + Добавить запись{selectedDate ? ` на ${selectedDate.slice(8)}.${selectedDate.slice(5,7)}` : ""}
           </button>
+
+          {/* Записи выбранного дня */}
+          {selectedDate && (
+            <div>
+              <div className="text-sm font-semibold mb-3" style={P}>
+                {selectedDate.slice(8)}.{selectedDate.slice(5,7)}.{selectedDate.slice(0,4)}
+                {" — "}
+                {selectedItems.length > 0 ? `${selectedItems.length} зап.` : "нет записей"}
+              </div>
+              <div className="space-y-2">
+                {selectedItems.map(item => (
+                  <div key={item.id} className="card-glow rounded-2xl p-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
+                        <div className="text-xs" style={PS}>{item.booking_time} · {item.services}</div>
+                        {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
+                      </div>
+                      <button onClick={() => del(item.id)} className="px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+                {selectedItems.length === 0 && <div className="text-center py-4 text-xs" style={PS}>Записей нет. Нажми «+ Добавить»</div>}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <div key={item.id} className="card-glow rounded-2xl p-4">
-            <div className="flex justify-between items-start mb-2">
+      {/* ─── СПИСОК ─── */}
+      {tab === "list" && (
+        <div className="px-4">
+          <button onClick={() => setAdding(!adding)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+            {adding ? "✕ Отмена" : "+ Добавить запись"}
+          </button>
+          {adding && (
+            <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
               <div>
-                <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
-                <div className="text-xs" style={PS}>{item.services}</div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Имя клиента</label>
+                <input value={form.client_name} onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))} placeholder="Имя" autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
               </div>
-              <button onClick={() => del(item.id)} className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Телефон</label>
+                <input value={form.client_phone} onChange={e => setForm(p => ({ ...p, client_phone: e.target.value }))} placeholder="+7..." type="tel" autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Услуги</label>
+                <input value={form.services} onChange={e => setForm(p => ({ ...p, services: e.target.value }))} placeholder="Криолиполиз, СМАС..." autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Дата</label>
+                <input value={form.booking_date} onChange={e => setForm(p => ({ ...p, booking_date: e.target.value }))} type="date" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Время</label>
+                <input value={form.booking_time} onChange={e => setForm(p => ({ ...p, booking_time: e.target.value }))} type="time" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Примечание</label>
+                <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Необязательно" autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+              </div>
+              <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+                {saving ? "Сохраняем..." : "Сохранить"}
+              </button>
             </div>
-            <div className="flex items-center gap-3 text-xs" style={PS}>
-              <span>📅 {item.booking_date}</span>
-              <span>🕐 {item.booking_time}</span>
-              <span>👩 {item.master}</span>
-            </div>
-            {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs mt-1 block" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
+          )}
+          {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+          <div className="space-y-2">
+            {items.map(item => (
+              <div key={item.id} className="card-glow rounded-2xl p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
+                    <div className="text-xs" style={PS}>{item.services}</div>
+                  </div>
+                  <button onClick={() => del(item.id)} className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+                </div>
+                <div className="flex items-center gap-3 text-xs" style={PS}>
+                  <span>📅 {item.booking_date}</span>
+                  <span>🕐 {item.booking_time}</span>
+                  <span>👩 {item.master}</span>
+                </div>
+                {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs mt-1 block" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
+              </div>
+            ))}
+            {!loading && items.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Расписание пусто</div>}
           </div>
-        ))}
-        {!loading && items.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Расписание пусто</div>}
-      </div>
+        </div>
+      )}
+
+      {/* ─── ЧАСЫ РАБОТЫ + ВЫХОДНЫЕ ─── */}
+      {tab === "workhours" && (
+        <div className="px-4 space-y-4">
+          {/* Выходные дни */}
+          <div className="card-glow rounded-2xl p-4">
+            <div className="font-semibold text-sm mb-1" style={P}>Выходные дни</div>
+            <p className="text-xs mb-3" style={PS}>Нажми на день чтобы отметить его выходным (красный = выходной)</p>
+            <div className="grid grid-cols-7 gap-1.5">
+              {DAY_NAMES_SHORT.map((d, idx) => (
+                <button key={d} onClick={() => toggleDayOff(idx)}
+                  className="py-2.5 rounded-xl text-xs font-bold transition-all"
+                  style={daysOff.includes(idx)
+                    ? { background: "hsl(0 60% 55%)", color: "white" }
+                    : { background: "hsl(335 20% 93%)", color: "hsl(335 50% 50%)" }}>
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Часы работы по дням */}
+          <div className="card-glow rounded-2xl p-4">
+            <div className="font-semibold text-sm mb-3" style={P}>Часы работы</div>
+            <div className="space-y-3">
+              {workDays.map((day, idx) => {
+                const dowIdx = (day.day_of_week + 6) % 7;
+                const isOff = daysOff.includes(dowIdx);
+                return (
+                  <div key={day.id || idx} className="flex items-center gap-2">
+                    <div className="w-7 text-[11px] font-semibold flex-shrink-0"
+                      style={{ color: isOff ? "hsl(0 60% 55%)" : "hsl(335 50% 40%)" }}>
+                      {DAY_NAMES_SHORT[dowIdx]}
+                    </div>
+                    {isOff ? (
+                      <div className="flex-1 text-xs text-center py-2 rounded-xl"
+                        style={{ background: "hsl(0 40% 97%)", color: "hsl(0 50% 65%)" }}>
+                        Выходной
+                      </div>
+                    ) : (
+                      <>
+                        <input value={day.time_from || "10:00"} type="time"
+                          onChange={e => setWorkDays(prev => prev.map((d2, i) => i === idx ? { ...d2, time_from: e.target.value } : d2))}
+                          className="flex-1 px-2 py-2 rounded-xl text-xs outline-none" style={inp} />
+                        <span className="text-xs" style={PS}>—</span>
+                        <input value={day.time_to || "20:00"} type="time"
+                          onChange={e => setWorkDays(prev => prev.map((d2, i) => i === idx ? { ...d2, time_to: e.target.value } : d2))}
+                          className="flex-1 px-2 py-2 rounded-xl text-xs outline-none" style={inp} />
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {savedWork && (
+            <div className="p-3 rounded-xl text-sm font-medium text-center" style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>
+              ✓ Расписание сохранено
+            </div>
+          )}
+          <button onClick={saveWorkHours} disabled={savingWork}
+            className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg" style={GRAD}>
+            {savingWork ? "Сохраняем..." : "💾 Сохранить расписание"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -3843,13 +4142,35 @@ function AdminSiteSettings() {
 
       {/* Картина на стене */}
       <div className="card-glow rounded-2xl p-4">
-        <div className="font-semibold text-sm mb-1" style={P}>Картина на стене (главная)</div>
-        <p className="text-xs mb-3" style={PS}>Изображение между блоком мастеров и разделами</p>
-        <PhotoUploadButton folder="wall" label="📷 Загрузить картину" uploading={uploadingWall} setUploading={setUploadingWall}
+        <div className="font-semibold text-sm mb-1" style={P}>Фото нашего салона (главная)</div>
+        <p className="text-xs mb-3" style={PS}>Большой баннер между мастерами и разделами</p>
+        <PhotoUploadButton folder="wall" label="📷 Загрузить фото салона" uploading={uploadingWall} setUploading={setUploadingWall}
           onUploaded={url => set("wall_image_url", url)} className="w-full mb-2" />
         {settings.wall_image_url && (
           <img src={settings.wall_image_url} className="w-full h-32 object-cover rounded-xl" alt="wall" />
         )}
+      </div>
+
+      {/* Фото разделов */}
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold text-sm mb-1" style={P}>Фото разделов</div>
+        <p className="text-xs mb-3" style={PS}>Фото вместо иконок в блоке «Разделы» на главной</p>
+        {[
+          { key: "section_pricelist_img", label: "Прайс-лист" },
+          { key: "section_gallery_img", label: "Галерея" },
+          { key: "section_reviews_img", label: "Отзывы" },
+          { key: "section_documents_img", label: "Документы" },
+        ].map(f => (
+          <div key={f.key} className="mb-3">
+            <label className="text-xs block mb-1" style={PS}>{f.label}</label>
+            <div className="flex items-center gap-2">
+              {settings[f.key] && (
+                <img src={settings[f.key]} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={f.label} />
+              )}
+              <SectionPhotoUpload settingKey={f.key} set={set} />
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Адрес и контакты */}
@@ -3980,6 +4301,58 @@ function ClientDocumentsPage({ setPage, onBack }: { setPage: (p: Page) => void; 
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Уведомления (хаб: рассылка + шаблоны + старые уведомления) ──
+function AdminNotificationsHub() {
+  const [tab, setTab] = useState<"broadcast" | "templates" | "history">("broadcast");
+  return (
+    <div>
+      <div className="px-4 mb-4">
+        <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+          {([
+            { id: "broadcast", label: "Рассылка" },
+            { id: "templates", label: "Шаблоны" },
+            { id: "history", label: "История" },
+          ] as const).map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex-1 py-2.5 text-xs font-semibold transition-all"
+              style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === "broadcast" && <AdminBroadcast />}
+      {tab === "templates" && <AdminNotificationTemplates />}
+      {tab === "history" && <AdminNotifications />}
+    </div>
+  );
+}
+
+// ── Сотрудники + Мастера (хаб) ──
+function AdminStaffHub({ currentStaffId }: { currentStaffId: number }) {
+  const [tab, setTab] = useState<"masters" | "staff">("masters");
+  return (
+    <div>
+      <div className="px-4 mb-4">
+        <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+          <button onClick={() => setTab("masters")}
+            className="flex-1 py-2.5 text-sm font-semibold transition-all"
+            style={tab === "masters" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            👩‍⚕️ Мастера
+          </button>
+          <button onClick={() => setTab("staff")}
+            className="flex-1 py-2.5 text-sm font-semibold transition-all"
+            style={tab === "staff" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            🔑 Доступ в панель
+          </button>
+        </div>
+      </div>
+      {tab === "masters" && <AdminMastersEditor />}
+      {tab === "staff" && <AdminStaff currentStaffId={currentStaffId} />}
     </div>
   );
 }

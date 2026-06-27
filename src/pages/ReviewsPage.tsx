@@ -50,8 +50,26 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
     })
       .then(r => r.json())
       .then(d => {
-        setYandexReviews(d.reviews || []);
+        const loaded = d.reviews || [];
+        setYandexReviews(loaded);
         setYandexRating(d.rating || null);
+        // Если в кеше пусто — автоматически синхронизируем с Яндекс
+        if (loaded.length === 0) {
+          syncYandexSilent();
+        }
+      })
+      .catch(() => {});
+  };
+
+  const syncYandexSilent = () => {
+    fetch(YANDEX_REVIEWS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync" }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) loadYandexReviews();
       })
       .catch(() => {});
   };
@@ -159,44 +177,34 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
         </div>
       </div>
 
-      {/* Яндекс: синхронизация */}
-      {activeTab === "yandex" && (
-        <div className="px-4 mb-4">
-          <button onClick={syncYandex} disabled={syncing}
-            className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
-            style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
-            <Icon name="RefreshCw" size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Синхронизируем..." : "Обновить с Яндекс Карт"}
-          </button>
-          {yandexReviews.length === 0 && !syncing && (
-            <p className="text-xs text-center mt-2" style={{ color: textMid }}>
-              Нажми «Обновить» чтобы загрузить отзывы с Яндекс Карт
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Кнопка написать отзыв (только вкладка сайта) */}
-      {activeTab === "site" && (
-        <div className="px-4 mb-5">
-          <button onClick={() => setShowForm(true)}
-            className="w-full py-3.5 rounded-2xl font-semibold text-white shadow-md"
-            style={GRAD}>
-            🌸 Написать отзыв
-          </button>
-        </div>
-      )}
-
-      {/* Ссылка на Яндекс */}
-      {activeTab === "yandex" && (
-        <div className="px-4 mb-4">
+      {/* Кнопки действий */}
+      <div className="px-4 mb-4 space-y-2">
+        {/* Оставить отзыв на Яндексе */}
+        {activeTab === "yandex" && (
           <a href="https://yandex.ru/maps/org/devchachiy_ray/46803820767" target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-semibold text-white shadow-md"
             style={GRAD}>
             ⭐ Оставить отзыв на Яндекс Картах
           </a>
-        </div>
-      )}
+        )}
+        {/* Написать отзыв на сайте */}
+        {activeTab === "site" && (
+          <button onClick={() => setShowForm(true)}
+            className="w-full py-3.5 rounded-2xl font-semibold text-white shadow-md"
+            style={GRAD}>
+            🌸 Написать отзыв
+          </button>
+        )}
+        {/* Кнопка обновить (маленькая, вторичная) */}
+        {activeTab === "yandex" && (
+          <button onClick={syncYandex} disabled={syncing}
+            className="w-full py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5"
+            style={{ background: "hsl(335 20% 96%)", color: "hsl(335 40% 60%)", border: "1px solid hsl(335 30% 90%)" }}>
+            <Icon name="RefreshCw" size={12} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Обновляем..." : "Обновить отзывы с Яндекс Карт"}
+          </button>
+        )}
+      </div>
 
       {done && (
         <div className="mx-4 mb-4 p-4 rounded-2xl text-sm font-medium text-center"
@@ -318,4 +326,3 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
     </div>
   );
 }
-

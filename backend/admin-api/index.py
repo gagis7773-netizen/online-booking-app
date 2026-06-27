@@ -541,5 +541,34 @@ def handler(event: dict, context) -> dict:
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"templates": rows})
 
+    # ── SMS НАПОМИНАНИЯ: записи на дату ──
+    if section == "schedule_reminders":
+        date = body.get("date", "")
+        cur.execute(f"""
+            SELECT id, client_name, client_phone, services, booking_time
+            FROM {SCHEMA}.schedule
+            WHERE booking_date = %s AND (reminder_sent IS NULL OR reminder_sent = false)
+        """, (date,))
+        bookings = [dict(r) for r in cur.fetchall()]
+        # Адрес салона
+        cur.execute(f"SELECT value FROM {SCHEMA}.site_settings WHERE key='salon_address' LIMIT 1")
+        addr_row = cur.fetchone()
+        salon_address = addr_row["value"] if addr_row else "ул. Заречная, 10, м. Парнас"
+        # Шаблон
+        cur.execute(f"SELECT body FROM {SCHEMA}.notification_templates WHERE template_key='booking_reminder' LIMIT 1")
+        tmpl_row = cur.fetchone()
+        template = tmpl_row["body"] if tmpl_row else "Girly Paradise: напоминаем, вы записаны завтра на {service} в {time}. Адрес: {address}. Ждём вас! 🌸"
+        conn.close()
+        return resp({"bookings": bookings, "salon_address": salon_address, "template": template})
+
+    # ── ПОМЕТИТЬ НАПОМИНАНИЯ КАК ОТПРАВЛЕННЫЕ ──
+    if section == "mark_reminders_sent":
+        ids = body.get("ids", [])
+        if ids:
+            placeholders = ",".join(["%s"] * len(ids))
+            cur.execute(f"UPDATE {SCHEMA}.schedule SET reminder_sent=true WHERE id IN ({placeholders})", ids)
+            conn.commit()
+        conn.close(); return resp({"ok": True})
+
     conn.close()
     return resp({"error": "Unknown section"}, 400)
