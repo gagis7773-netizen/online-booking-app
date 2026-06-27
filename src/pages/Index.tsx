@@ -5,13 +5,70 @@ import ReviewsPage from "./ReviewsPage";
 import ChatPage from "./ChatPage";
 
 // ── Звуковые уведомления ──
-const SOUND_PRESETS: Record<string, { label: string; freq: number[]; type: OscillatorType }> = {
+const SOUND_PRESETS: Record<string, { label: string; freq: number[]; type: OscillatorType; dur?: number }> = {
   bell: { label: "Колокольчик 🔔", freq: [880, 1100, 880], type: "sine" },
   pop: { label: "Поп 💬", freq: [600, 900], type: "sine" },
   chime: { label: "Перезвон ✨", freq: [523, 659, 784, 1046], type: "triangle" },
   ding: { label: "Динь 🎵", freq: [1047], type: "sine" },
   soft: { label: "Тихий 🎶", freq: [440, 554], type: "sine" },
 };
+
+// Нежная мелодия приветствия (как лёгкий переливающийся перезвон)
+function playWelcomeSound(volume = 0.35) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Нежная пентатоника: до-ми-соль-ля-до
+    const notes = [523.25, 659.25, 783.99, 880, 1046.5, 880, 783.99];
+    const gap = 0.13;
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * gap;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(volume * 0.25, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+  } catch { /* silent */ }
+}
+
+// Победный нежный аккорд при успешной записи
+function playBookingSound(volume = 0.4) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Торжественный аккорд: до-ми-соль-до(октава)
+    const chords = [
+      [523.25, 659.25, 783.99],   // C major
+      [659.25, 783.99, 1046.5],   // +octave
+    ];
+    chords.forEach((chord, ci) => {
+      chord.forEach(freq => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const t = ctx.currentTime + ci * 0.22;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(volume * 0.18, t + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+        osc.start(t); osc.stop(t + 0.65);
+      });
+    });
+    // Финальная нотка-«звёздочка»
+    const osc3 = ctx.createOscillator();
+    const g3 = ctx.createGain();
+    osc3.connect(g3); g3.connect(ctx.destination);
+    osc3.type = "triangle"; osc3.frequency.value = 1568;
+    const t3 = ctx.currentTime + 0.5;
+    g3.gain.setValueAtTime(volume * 0.15, t3);
+    g3.gain.exponentialRampToValueAtTime(0.001, t3 + 0.4);
+    osc3.start(t3); osc3.stop(t3 + 0.45);
+  } catch { /* silent */ }
+}
 
 function playNotificationSound(preset = "bell", volume = 0.5) {
   try {
@@ -39,6 +96,16 @@ function getSoundSettings() {
 }
 function saveSoundSettings(s: Record<string, any>) {
   localStorage.setItem("gp_sound_settings", JSON.stringify(s));
+}
+
+// Проверка: включён ли звук у клиента
+function isClientSoundEnabled() {
+  try {
+    return localStorage.getItem("gp_client_sound") !== "off";
+  } catch { return true; }
+}
+function setClientSound(on: boolean) {
+  localStorage.setItem("gp_client_sound", on ? "on" : "off");
 }
 
 const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/11e394f0-e373-4e52-bea5-7b8a5ce187c2.png";
@@ -215,6 +282,14 @@ export default function Index() {
   const [bookingDone, setBookingDone] = useState(false);
 
   useEffect(() => {
+    // Звук приветствия при открытии сайта (если клиент залогинен)
+    if (client && isClientSoundEnabled()) {
+      const timer = setTimeout(() => playWelcomeSound(0.3), 600);
+      return () => clearTimeout(timer);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     adminPost("site_settings").then(d => setSiteSettings(d.settings || {})).catch(() => {});
     adminPost("masters", { active_only: true }).then(d => {
       if (d.masters && d.masters.length > 0) {
@@ -239,8 +314,11 @@ export default function Index() {
     const isNew = !loadClient();
     saveClient(c);
     setClient(c);
+    // Нежный звук приветствия при входе
+    if (isClientSoundEnabled()) {
+      setTimeout(() => playWelcomeSound(0.35), 200);
+    }
     if (isNew) {
-      // Уведомляем владельца о новой регистрации
       adminPost("notify_owner", {
         event_type: "new_client",
         message: `Girly Paradise: новый клиент зарегистрировался! ${c.name}, тел: ${c.phone}`,
@@ -291,6 +369,10 @@ export default function Index() {
   const confirmBooking = () => {
     setBookingDone(true);
     setBookingStep(4);
+    // Торжественный звук при успешной записи
+    if (isClientSoundEnabled()) {
+      setTimeout(() => playBookingSound(0.4), 300);
+    }
   };
 
   return (
@@ -473,6 +555,47 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         </button>
       </div>
 
+      {/* Видео (показывается если включено в настройках) */}
+      {siteSettings.video_show === "true" && siteSettings.video_url && (
+        <div className="px-4 mb-5">
+          {siteSettings.video_title && (
+            <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>
+              {siteSettings.video_title}
+            </h2>
+          )}
+          <div className="rounded-3xl overflow-hidden shadow-xl"
+            style={{ height: Number(siteSettings.video_height || 240) }}>
+            {siteSettings.video_url.includes("youtube.com") || siteSettings.video_url.includes("youtu.be") ? (
+              /* YouTube embed */
+              <iframe
+                src={siteSettings.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ border: "none" }}
+              />
+            ) : siteSettings.video_url.includes("vk.com") ? (
+              /* VK embed */
+              <iframe
+                src={siteSettings.video_url}
+                className="w-full h-full"
+                allow="autoplay; encrypted-media; fullscreen"
+                style={{ border: "none" }}
+              />
+            ) : (
+              /* Прямой mp4/видеофайл */
+              <video
+                src={siteSettings.video_url}
+                controls
+                playsInline
+                className="w-full h-full object-cover"
+                style={{ background: "#000" }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Разделы */}
       <div className="px-4 mb-5">
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
@@ -484,7 +607,8 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
             { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img", hKey: "section_documents_h" },
           ].map(item => {
             const img = siteSettings[item.imgKey];
-            const h = Number(siteSettings[item.hKey] || 96);
+            // Индивидуальная высота карточки или глобальная из настроек
+            const h = Number(siteSettings[item.hKey] || siteSettings.section_card_height || 140);
             return (
               <button key={item.page} onClick={() => setPage(item.page)}
                 className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
@@ -498,7 +622,7 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4">
+                  <div className="p-4" style={{ minHeight: h }}>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
                       style={{ background: "hsl(335 80% 60% / 0.1)", border: "1px solid hsl(335 70% 85%)" }}>
                       <Icon name={item.icon as any} size={18} style={{ color: "hsl(335 75% 52%)" }} />
@@ -1221,6 +1345,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   const [showReview, setShowReview] = useState(false);
   const [reviewText, setReviewText] = useState("");
   const [reviewSent, setReviewSent] = useState(false);
+  const [soundOn, setSoundOn] = useState(isClientSoundEnabled());
   const siteUrl = window.location.href;
 
   useEffect(() => {
@@ -1340,32 +1465,45 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
           </button>
         </div>
 
-        {/* Кнопки Share / Install / Отзыв / ВКонтакте */}
-        <div className="grid grid-cols-4 gap-2 mb-5">
+        {/* Кнопки Share / Install / Отзыв / ВКонтакте / Звук */}
+        <div className="grid grid-cols-5 gap-1.5 mb-5">
           <button onClick={() => setShowShare(!showShare)}
-            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
+            className="py-2.5 rounded-2xl text-[10px] font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
-            <Icon name="Share2" size={16} />
+            <Icon name="Share2" size={15} />
             Поделиться
           </button>
           <button onClick={handleInstall}
-            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
+            className="py-2.5 rounded-2xl text-[10px] font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
-            <Icon name="Smartphone" size={16} />
+            <Icon name="Smartphone" size={15} />
             На экран
           </button>
           <button onClick={() => setShowReview(!showReview)}
-            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
+            className="py-2.5 rounded-2xl text-[10px] font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
-            <Icon name="Star" size={16} />
+            <Icon name="Star" size={15} />
             Отзыв
           </button>
           <a href="https://vk.ru/world_of_galis" target="_blank" rel="noopener noreferrer"
-            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
+            className="py-2.5 rounded-2xl text-[10px] font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(215 80% 96%)", color: "hsl(215 70% 45%)", border: "1px solid hsl(215 60% 85%)" }}>
-            <Icon name="ExternalLink" size={16} style={{ color: "hsl(215 70% 45%)" }} />
+            <Icon name="ExternalLink" size={15} style={{ color: "hsl(215 70% 45%)" }} />
             ВКонтакте
           </a>
+          <button onClick={() => {
+            const next = !soundOn;
+            setSoundOn(next);
+            setClientSound(next);
+            if (next) playWelcomeSound(0.3);
+          }}
+            className="py-2.5 rounded-2xl text-[10px] font-medium flex flex-col items-center gap-1"
+            style={soundOn
+              ? { background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)", border: "1px solid hsl(142 50% 80%)" }
+              : { background: "hsl(335 10% 94%)", color: "hsl(335 10% 55%)", border: "1px solid hsl(335 10% 85%)" }}>
+            <Icon name={soundOn ? "Volume2" : "VolumeX"} size={15} />
+            {soundOn ? "Звук вкл" : "Звук выкл"}
+          </button>
         </div>
 
         {/* Поделиться — выбор мессенджера */}
@@ -4434,6 +4572,103 @@ function AdminSiteSettings() {
         <button onClick={saveAll} disabled={saving}
           className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
           {saving ? "Сохраняем..." : "💾 Сохранить высоты карточек"}
+        </button>
+      </div>
+
+      {/* Видео на главной */}
+      <div className="card-glow rounded-2xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-sm" style={P}>Видео на главной 🎬</div>
+            <p className="text-xs mt-0.5" style={PS}>Видео между фото салона и разделами</p>
+          </div>
+          {/* Переключатель показать/скрыть */}
+          <button
+            onClick={() => set("video_show", settings.video_show === "true" ? "false" : "true")}
+            className="w-12 h-6 rounded-full transition-all relative flex-shrink-0"
+            style={{ background: settings.video_show === "true" ? "hsl(335 80% 58%)" : "hsl(335 20% 85%)" }}>
+            <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+              style={{ left: settings.video_show === "true" ? 26 : 2 }} />
+          </button>
+        </div>
+
+        <div>
+          <label className="text-xs block mb-1" style={PS}>Ссылка на видео (YouTube, ВКонтакте или mp4)</label>
+          <input value={settings.video_url || ""} onChange={e => set("video_url", e.target.value)}
+            placeholder="https://youtube.com/watch?v=... или ссылка на mp4"
+            className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={inp} />
+          <p className="text-[10px] mt-1" style={PS}>YouTube: вставь обычную ссылку. ВКонтакте: Поделиться → Скопировать код → вставь ссылку из src=""</p>
+        </div>
+
+        <div>
+          <label className="text-xs block mb-1" style={PS}>Заголовок над видео</label>
+          <input value={settings.video_title || ""} onChange={e => set("video_title", e.target.value)}
+            placeholder="Наш салон" className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={inp} />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs" style={PS}>Высота видео</label>
+            <span className="text-xs font-medium" style={P}>{settings.video_height || "240"}px</span>
+          </div>
+          <input type="range" min="160" max="480" step="10"
+            value={settings.video_height || "240"}
+            onChange={e => set("video_height", e.target.value)}
+            className="w-full accent-pink-500" />
+        </div>
+
+        {/* Превью */}
+        {settings.video_show === "true" && settings.video_url && (
+          <div className="rounded-xl overflow-hidden" style={{ height: Number(settings.video_height || 240) }}>
+            {settings.video_url.includes("youtube.com") || settings.video_url.includes("youtu.be") ? (
+              <iframe
+                src={settings.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                className="w-full h-full" style={{ border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen />
+            ) : settings.video_url.includes("vk.com") ? (
+              <iframe src={settings.video_url} className="w-full h-full" style={{ border: "none" }}
+                allow="autoplay; encrypted-media; fullscreen" />
+            ) : (
+              <video src={settings.video_url} controls playsInline className="w-full h-full object-cover" />
+            )}
+          </div>
+        )}
+
+        <button onClick={saveAll} disabled={saving}
+          className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : "💾 Сохранить настройки видео"}
+        </button>
+      </div>
+
+      {/* Высота карточек разделов (глобальная) */}
+      <div className="card-glow rounded-2xl p-4 space-y-3">
+        <div className="font-semibold text-sm" style={P}>Высота карточек разделов</div>
+        <p className="text-xs" style={PS}>Единая высота для всех карточек в блоке «Разделы» на главной</p>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs" style={PS}>Высота</label>
+            <span className="text-xs font-medium" style={P}>{settings.section_card_height || "140"}px</span>
+          </div>
+          <input type="range" min="80" max="280" step="8"
+            value={settings.section_card_height || "140"}
+            onChange={e => set("section_card_height", e.target.value)}
+            className="w-full accent-pink-500" />
+        </div>
+        {/* Мини-превью */}
+        <div className="grid grid-cols-2 gap-2">
+          {["Прайс-лист", "Галерея", "Отзывы", "Документы"].map(label => (
+            <div key={label} className="card-glow rounded-xl overflow-hidden flex items-end"
+              style={{ height: Number(settings.section_card_height || 140), background: "hsl(335 80% 60% / 0.08)" }}>
+              <div className="p-2">
+                <div className="text-xs font-semibold" style={{ color: "hsl(335 50% 28%)" }}>{label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={saveAll} disabled={saving}
+          className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : "💾 Сохранить высоту"}
         </button>
       </div>
 
