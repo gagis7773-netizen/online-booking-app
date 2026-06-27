@@ -170,51 +170,61 @@ function clearCart() { localStorage.removeItem("gp_cart"); }
 const adminPost = (section: string, extra?: object) =>
   fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
 
-// Сжатие изображения через Canvas — уменьшаем до безопасного размера для передачи
-async function compressImage(file: File, maxSizePx = 1200, quality = 0.78): Promise<string> {
+// Безопасное сжатие: сначала читаем размеры через Blob URL, потом рисуем сразу в маленький canvas
+async function compressImage(file: File): Promise<string> {
+  // Ограничиваем входной файл — если > 15 МБ, браузер на телефоне упадёт
+  if (file.size > 15 * 1024 * 1024) {
+    throw new Error("Файл слишком большой (максимум 15 МБ). Выбери фото поменьше.");
+  }
+
+  const MAX_PX = 1080;   // максимальная сторона — безопасно для мобильных
+  const QUALITY = 0.80;
+
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let { width, height } = img;
-        // Уменьшаем если больше maxSizePx
-        if (width > maxSizePx || height > maxSizePx) {
-          if (width > height) { height = Math.round((height / width) * maxSizePx); width = maxSizePx; }
-          else { width = Math.round((width / height) * maxSizePx); height = maxSizePx; }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(e.target?.result as string); return; }
-        ctx.drawImage(img, 0, 0, width, height);
-        let result = canvas.toDataURL("image/jpeg", quality);
-        // Если всё ещё слишком большой (>3МБ base64) — сжимаем ещё
-        if (result.length > 3_000_000) {
-          result = canvas.toDataURL("image/jpeg", 0.6);
-        }
-        if (result.length > 3_000_000) {
-          // Уменьшаем размер ещё раз
-          const canvas2 = document.createElement("canvas");
-          canvas2.width = Math.round(width * 0.7); canvas2.height = Math.round(height * 0.7);
-          const ctx2 = canvas2.getContext("2d");
-          if (ctx2) { ctx2.drawImage(img, 0, 0, canvas2.width, canvas2.height); result = canvas2.toDataURL("image/jpeg", 0.65); }
-        }
-        resolve(result);
-      };
-      img.src = e.target?.result as string;
+    // Blob URL — не грузит всё в память сразу в отличие от readAsDataURL
+    const blobUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("Не удалось прочитать изображение")); };
+    img.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+
+      let { naturalWidth: w, naturalHeight: h } = img;
+
+      // Вычисляем целевой размер
+      if (w > MAX_PX || h > MAX_PX) {
+        if (w >= h) { h = Math.round((h / w) * MAX_PX); w = MAX_PX; }
+        else        { w = Math.round((w / h) * MAX_PX); h = MAX_PX; }
+      }
+
+      // Рисуем сразу в маленький canvas — экономим память
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d", { alpha: false }); // alpha: false — ещё экономия
+      if (!ctx) { reject(new Error("Canvas недоступен")); return; }
+
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Сначала пробуем нужное качество
+      let result = canvas.toDataURL("image/jpeg", QUALITY);
+
+      // Если base64 > 2 МБ — жмём сильнее
+      if (result.length > 2_000_000) result = canvas.toDataURL("image/jpeg", 0.65);
+      if (result.length > 2_000_000) result = canvas.toDataURL("image/jpeg", 0.50);
+
+      // Освобождаем canvas
+      canvas.width = 1; canvas.height = 1;
+
+      resolve(result);
     };
-    reader.readAsDataURL(file);
+
+    img.src = blobUrl;
   });
 }
 
 // Загрузка фото в S3 — с retry при сетевой ошибке
 async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
-  // Проверяем размер файла (не более 20МБ)
-  if (file.size > 20 * 1024 * 1024) throw new Error("Файл слишком большой (максимум 20 МБ)");
-
   const base64 = await compressImage(file);
 
   // Retry до 3 раз
@@ -360,17 +370,22 @@ function PhotoUploadButton({
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+            // Проверяем до начала загрузки — не даём взорвать браузер
+            if (file.size > 15 * 1024 * 1024) {
+              alert("Фото слишком большое (больше 15 МБ).\nОткрой его в галерее телефона → Поделиться → выбери меньшее качество, или сделай скриншот.");
+              e.target.value = "";
+              return;
+            }
             setUploading(true);
             setStatus("Сжимаем фото...");
             try {
-              setStatus("Отправляем...");
               const url = await uploadPhoto(file, folder);
               setStatus("");
               onUploaded(url);
             } catch (err: any) {
               setStatus("");
               const msg = err?.message || "Неизвестная ошибка";
-              alert(`Не удалось загрузить фото.\n${msg}\n\nПопробуй выбрать фото меньшего размера.`);
+              alert(`Не удалось загрузить фото.\n${msg}`);
             }
             finally { setUploading(false); e.target.value = ""; }
           }} />
