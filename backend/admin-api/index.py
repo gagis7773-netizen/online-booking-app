@@ -352,10 +352,13 @@ def handler(event: dict, context) -> dict:
     # ── ГАЛЕРЕЯ (с папками) ──
     if section == "gallery":
         if body.get("action") == "add":
-            cur.execute(f"INSERT INTO {SCHEMA}.admin_gallery (title, url, category, folder_id) VALUES (%s,%s,%s,%s) RETURNING id",
-                        (body.get("title",""), body.get("url",""), body.get("category",""), body.get("folder_id")))
+            cur.execute(f"INSERT INTO {SCHEMA}.admin_gallery (title, url, category, folder_id, display_size) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                        (body.get("title",""), body.get("url",""), body.get("category",""), body.get("folder_id"), body.get("display_size","medium")))
             row_id = cur.fetchone()["id"]
             conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "update_size":
+            cur.execute(f"UPDATE {SCHEMA}.admin_gallery SET display_size=%s WHERE id=%s", (body.get("display_size","medium"), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
         if body.get("action") == "deactivate":
             cur.execute(f"UPDATE {SCHEMA}.admin_gallery SET category='archived' WHERE id=%s", (body.get("id"),))
             conn.commit(); conn.close(); return resp({"ok": True})

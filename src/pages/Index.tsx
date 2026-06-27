@@ -3668,7 +3668,16 @@ function AdminGalleryFolders() {
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [photoSize, setPhotoSize] = useState<"small" | "medium" | "large" | "wide">("medium");
+  const [editingSize, setEditingSize] = useState<number | null>(null);
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const SIZE_OPTIONS = [
+    { id: "small",  label: "Маленькое", icon: "⬛", hint: "1×1 · маленький квадрат" },
+    { id: "medium", label: "Среднее",   icon: "🟦", hint: "1×1 · обычный квадрат" },
+    { id: "large",  label: "Большое",   icon: "🟫", hint: "2×2 · крупное" },
+    { id: "wide",   label: "Широкое",   icon: "▬",  hint: "2×1 · горизонтальное" },
+  ] as const;
 
   const loadFolders = () => adminPost("gallery_folders").then(d => { setFolders(d.folders || []); setLoading(false); });
   useEffect(() => { loadFolders(); }, []);
@@ -3691,9 +3700,16 @@ function AdminGalleryFolders() {
   const addPhoto = async () => {
     if (!photoForm.url || !activeFolder) return;
     setSaving(true);
-    await adminPost("gallery", { action: "add", ...photoForm, folder_id: activeFolder.id, category: activeFolder.name });
+    await adminPost("gallery", { action: "add", ...photoForm, folder_id: activeFolder.id, category: activeFolder.name, display_size: photoSize });
     setPhotoForm({ url: "", title: "" });
+    setPhotoSize("medium");
     setAddingPhoto(false); setSaving(false); loadPhotos(activeFolder.id);
+  };
+
+  const updatePhotoSize = async (id: number, display_size: string) => {
+    await adminPost("gallery", { action: "update_size", id, display_size });
+    setEditingSize(null);
+    loadPhotos(activeFolder!.id);
   };
 
   const removePhoto = async (id: number) => {
@@ -3739,6 +3755,25 @@ function AdminGalleryFolders() {
             <input value={photoForm.title} onChange={e => setPhotoForm(p => ({ ...p, title: e.target.value }))} placeholder="Описание фото"
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
           </div>
+          {/* Размер фото */}
+          <div>
+            <label className="text-xs font-medium block mb-2" style={PS}>Размер в галерее</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {SIZE_OPTIONS.map(s => (
+                <button key={s.id} onClick={() => setPhotoSize(s.id)}
+                  className="flex flex-col items-center gap-1 py-2 rounded-xl text-center transition-all"
+                  style={photoSize === s.id
+                    ? { ...GRAD, color: "white" }
+                    : { background: "hsl(335 20% 95%)", color: "hsl(335 40% 55%)" }}>
+                  <span className="text-base leading-none">{s.icon}</span>
+                  <span className="text-[10px] font-semibold leading-tight">{s.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] mt-1.5" style={PS}>
+              {SIZE_OPTIONS.find(s => s.id === photoSize)?.hint}
+            </p>
+          </div>
           {photoForm.url && <img src={photoForm.url} className="w-full h-40 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
           <button onClick={addPhoto} disabled={saving || uploadingPhoto || !photoForm.url} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
             {saving ? "Добавляем..." : "Добавить фото"}
@@ -3747,16 +3782,52 @@ function AdminGalleryFolders() {
       )}
 
       {photosLoading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
-      <div className="grid grid-cols-2 gap-3">
-        {photos.map(ph => (
-          <div key={ph.id} className="card-glow rounded-2xl overflow-hidden relative">
-            <img src={ph.url} alt={ph.title} className="w-full h-36 object-cover" />
-            {ph.title && <div className="px-2 py-1.5 text-xs truncate" style={P}>{ph.title}</div>}
-            <button onClick={() => removePhoto(ph.id)}
-              className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ background: "rgba(255,255,255,0.92)", color: "hsl(0 60% 55%)" }}>✕</button>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-2" style={{ gridAutoRows: "minmax(120px, auto)" }}>
+        {photos.map(ph => {
+          const size = ph.display_size || "medium";
+          const colSpan = size === "large" || size === "wide" ? "col-span-2" : "col-span-1";
+          const heightClass = size === "small" ? "h-24" : size === "large" ? "h-64" : size === "wide" ? "h-36" : "h-36";
+          return (
+            <div key={ph.id} className={`card-glow rounded-2xl overflow-hidden relative ${colSpan}`}>
+              <img src={ph.url} alt={ph.title} className={`w-full ${heightClass} object-cover`} />
+              {ph.title && <div className="px-2 py-1.5 text-xs truncate" style={P}>{ph.title}</div>}
+
+              {/* Кнопки управления */}
+              <div className="absolute top-2 right-2 flex gap-1">
+                {/* Изменить размер */}
+                <button onClick={() => setEditingSize(editingSize === ph.id ? null : ph.id)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow"
+                  style={{ background: "rgba(255,255,255,0.92)", color: "hsl(335 60% 45%)" }}
+                  title="Размер">⤢</button>
+                {/* Удалить */}
+                <button onClick={() => removePhoto(ph.id)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow"
+                  style={{ background: "rgba(255,255,255,0.92)", color: "hsl(0 60% 55%)" }}
+                  title="Удалить">✕</button>
+              </div>
+
+              {/* Попап смены размера */}
+              {editingSize === ph.id && (
+                <div className="absolute inset-x-2 bottom-2 rounded-xl p-2 shadow-xl"
+                  style={{ background: "rgba(255,255,255,0.97)", border: "1px solid hsl(335 50% 85%)" }}>
+                  <div className="text-[10px] font-semibold mb-1.5 text-center" style={PS}>Выбери размер</div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {SIZE_OPTIONS.map(s => (
+                      <button key={s.id} onClick={() => updatePhotoSize(ph.id, s.id)}
+                        className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-center transition-all"
+                        style={(ph.display_size || "medium") === s.id
+                          ? { ...GRAD, color: "white" }
+                          : { background: "hsl(335 20% 95%)", color: "hsl(335 40% 55%)" }}>
+                        <span className="text-sm leading-none">{s.icon}</span>
+                        <span className="text-[9px] leading-tight">{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {!photosLoading && photos.length === 0 && (
           <div className="col-span-2 text-center py-8 text-sm" style={PS}>В папке пока нет фото</div>
         )}
@@ -4361,13 +4432,19 @@ function ClientGalleryPage({ setPage, onBack }: { setPage: (p: Page) => void; on
               <p className="text-sm" style={PS}>В этой папке пока нет фото</p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            {photos.map(ph => (
-              <button key={ph.id} onClick={() => setFullscreen(ph.url)} className="rounded-2xl overflow-hidden hover:scale-[1.02] transition-all">
-                <img src={ph.url} alt={ph.title} className="w-full h-36 object-cover" />
-                {ph.title && <div className="px-2 py-1.5 text-xs text-left" style={{ background: "hsl(335 80% 98%)", ...P }}>{ph.title}</div>}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2" style={{ gridAutoRows: "minmax(120px, auto)" }}>
+            {photos.map(ph => {
+              const size = ph.display_size || "medium";
+              const colSpan = size === "large" || size === "wide" ? "col-span-2" : "col-span-1";
+              const heightClass = size === "small" ? "h-24" : size === "large" ? "h-64" : size === "wide" ? "h-36" : "h-36";
+              return (
+                <button key={ph.id} onClick={() => setFullscreen(ph.url)}
+                  className={`rounded-2xl overflow-hidden hover:scale-[1.02] transition-all ${colSpan}`}>
+                  <img src={ph.url} alt={ph.title} className={`w-full ${heightClass} object-cover`} />
+                  {ph.title && <div className="px-2 py-1.5 text-xs text-left" style={{ background: "hsl(335 80% 98%)", color: "hsl(335 50% 30%)" }}>{ph.title}</div>}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
