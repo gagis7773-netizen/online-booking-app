@@ -625,7 +625,7 @@ export default function Index() {
         {page === "reviews" && <ReviewsPage onBack={() => navigateBack("home")} />}
         {page === "gallery" && <ClientGalleryPage setPage={navigateTo} onBack={() => navigateBack("home")} />}
         {page === "documents" && <ClientDocumentsPage setPage={navigateTo} onBack={() => navigateBack("home")} />}
-        {page === "chat" && <ChatPage onBack={() => navigateBack("home")} />}
+        {page === "chat" && <ChatPage onBack={() => navigateBack("home")} client={client} />}
         {page === "admin" && <AdminPage onBack={() => navigateBack("home")} />}
         {page === "shop" && <ShopPage client={client} onBack={() => navigateBack("home")} />}
       </div>

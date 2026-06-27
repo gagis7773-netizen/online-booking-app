@@ -33,14 +33,15 @@ const pinkBorder = "hsl(335 50% 85%)";
 const textDark = "hsl(335 50% 25%)";
 const textMid = "hsl(335 30% 55%)";
 
-export default function ChatPage({ onBack }: { onBack?: () => void }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+export default function ChatPage({ onBack, client }: { onBack?: () => void; client?: any }) {
+  const [name, setName] = useState(client?.name || "");
+  const [phone, setPhone] = useState(client?.phone || "");
   const [chatId, setChatId] = useState<number | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [started, setStarted] = useState(false);
+  const [autoStarting, setAutoStarting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef<number>(0);
@@ -52,13 +53,27 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
     const res = await fetch(`${CHAT_URL}/messages?chat_id=${id}`);
     const data = await res.json();
     const msgs = data.messages || [];
-    // Звук при новом входящем сообщении от менеджера
     const incoming = msgs.filter((m: any) => m.sender !== "client");
     if (incoming.length > prevMsgCount.current && prevMsgCount.current > 0) {
       playClientMessageSound();
     }
     prevMsgCount.current = incoming.length;
     setMessages(msgs);
+  };
+
+  const startChat = async (clientName: string, clientPhone: string) => {
+    if (!clientName.trim()) return;
+    const res = await fetch(`${CHAT_URL}/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_name: clientName, client_phone: clientPhone, message: "Здравствуйте! Хочу узнать подробнее." }),
+    });
+    const data = await res.json();
+    setChatId(data.chat_id);
+    chatIdRef.current = data.chat_id;
+    setStarted(true);
+    localStorage.setItem("girly_chat", JSON.stringify({ chatId: data.chat_id, name: clientName, phone: clientPhone }));
+    loadMessages(data.chat_id);
   };
 
   useEffect(() => {
@@ -69,8 +84,14 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
       setChatId(id); chatIdRef.current = id;
       setName(n); setPhone(p); setStarted(true);
       loadMessages(id);
+      return;
     }
-  }, []);
+    // Клиент уже залогинен — стартуем чат автоматически
+    if (client?.name) {
+      setAutoStarting(true);
+      startChat(client.name, client.phone || "").finally(() => setAutoStarting(false));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Поллинг новых сообщений каждые 8 секунд
   useEffect(() => {
@@ -80,21 +101,6 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
   }, [started, chatId]);
 
   useEffect(() => { scroll(); }, [messages]);
-
-  const startChat = async () => {
-    if (!name.trim()) return;
-    const res = await fetch(`${CHAT_URL}/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_name: name, client_phone: phone, message: "Здравствуйте! Хочу узнать подробнее." }),
-    });
-    const data = await res.json();
-    setChatId(data.chat_id);
-    chatIdRef.current = data.chat_id;
-    setStarted(true);
-    localStorage.setItem("girly_chat", JSON.stringify({ chatId: data.chat_id, name, phone }));
-    loadMessages(data.chat_id);
-  };
 
   const sendMessage = async (content: string, type = "text", fileData?: string, fileName?: string) => {
     if (!chatId || (!content && !fileData)) return;
@@ -134,8 +140,23 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
   };
 
   if (!started) {
+    // Автозапуск — клиент залогинен, ждём пока чат откроется
+    if (autoStarting) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen animate-fade-in">
+          <div className="text-5xl mb-4 animate-float">💬</div>
+          <p className="text-sm" style={{ color: textMid }}>Открываем чат...</p>
+        </div>
+      );
+    }
+
     return (
       <div className="animate-fade-in px-4 pt-12 pb-6">
+        {onBack && (
+          <button onClick={onBack} className="flex items-center gap-2 text-sm mb-6" style={{ color: textMid }}>
+            <Icon name="ChevronLeft" size={16} /> Назад
+          </button>
+        )}
         <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: textDark }}>Написать нам 💬</h1>
         <p className="text-sm mb-6" style={{ color: textMid }}>Ответим в ближайшее время</p>
         <div className="card-glow rounded-3xl p-6 space-y-4">
@@ -151,7 +172,7 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
               className="w-full px-4 py-3 rounded-xl outline-none text-sm"
               style={{ background: "white", border: `1px solid ${pinkBorder}`, color: textDark }} />
           </div>
-          <button onClick={startChat} disabled={!name.trim()}
+          <button onClick={() => startChat(name, phone)} disabled={!name.trim()}
             className="w-full py-4 rounded-2xl font-semibold text-white text-base shadow-md"
             style={{ background: name.trim() ? `linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))` : "hsl(335 20% 88%)", color: name.trim() ? "white" : "hsl(335 20% 65%)" }}>
             Начать чат 🌸
