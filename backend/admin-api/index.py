@@ -441,5 +441,38 @@ def handler(event: dict, context) -> dict:
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"masters": rows})
 
+    # ── ДОКУМЕНТЫ И СЕРТИФИКАТЫ ──
+    if section == "documents":
+        if body.get("action") == "add":
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.documents (title, description, file_url, doc_type, sort_order)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id
+            """, (body.get("title",""), body.get("description",""), body.get("file_url",""),
+                  body.get("doc_type","certificate"), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "toggle":
+            cur.execute(f"UPDATE {SCHEMA}.documents SET is_active = NOT is_active WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        active_only = body.get("active_only", False)
+        if active_only:
+            cur.execute(f"SELECT * FROM {SCHEMA}.documents WHERE is_active=true ORDER BY sort_order, id")
+        else:
+            cur.execute(f"SELECT * FROM {SCHEMA}.documents ORDER BY sort_order, id")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"documents": rows})
+
+    # ── УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ ──
+    if section == "notify_owner":
+        event_type = body.get("event_type", "")
+        message = body.get("message", "")
+        api_id = os.environ.get("SMSRU_API_ID", "")
+        owner_phone = "79046015556"
+        sent = False
+        if api_id and owner_phone:
+            sent = send_sms(owner_phone, message)
+        conn.close()
+        return resp({"ok": True, "sent": sent})
+
     conn.close()
     return resp({"error": "Unknown section"}, 400)

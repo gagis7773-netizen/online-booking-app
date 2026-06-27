@@ -13,9 +13,63 @@ const GALINA_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9
 const AUTH_URL = "https://functions.poehali.dev/888bfad7-6580-4f39-b963-78aca5d4d8c0";
 const ADMIN_API_URL = "https://functions.poehali.dev/6a39495b-54c8-4d05-a0e8-81e258a80299";
 const SEND_BOOKING_URL = "https://functions.poehali.dev/33731d63-c7a5-4a89-b075-6b0a4282ecfc";
+const UPLOAD_URL = "https://functions.poehali.dev/ccf6566c-3696-4ba5-af83-98e41caa2162";
+const YANDEX_REVIEWS_URL = "https://functions.poehali.dev/4ef8938c-3c1a-44c7-82d4-d62e6f0546fa";
 
 const adminPost = (section: string, extra?: object) =>
   fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
+
+// Загрузка фото в S3 из base64
+async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target?.result as string;
+      try {
+        const res = await fetch(UPLOAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64, folder }),
+        });
+        const data = await res.json();
+        if (data.url) resolve(data.url);
+        else reject(new Error("No URL"));
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Переиспользуемая кнопка загрузки фото
+function PhotoUploadButton({
+  onUploaded, folder = "uploads", label = "📷 Загрузить фото", className = "", uploading, setUploading
+}: {
+  onUploaded: (url: string) => void;
+  folder?: string;
+  label?: string;
+  className?: string;
+  uploading: boolean;
+  setUploading: (v: boolean) => void;
+}) {
+  return (
+    <label className={"cursor-pointer flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all " + className}
+      style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px dashed hsl(335 50% 80%)" }}>
+      {uploading ? "Загружаем..." : label}
+      <input type="file" accept="image/*" className="hidden" disabled={uploading}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setUploading(true);
+          try {
+            const url = await uploadPhoto(file, folder);
+            onUploaded(url);
+          } catch { alert("Ошибка загрузки, попробуй ещё раз"); }
+          finally { setUploading(false); e.target.value = ""; }
+        }} />
+    </label>
+  );
+}
 
 type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery";
 
@@ -95,8 +149,16 @@ export default function Index() {
   const masters = dynamicMasters.length > 0 ? dynamicMasters : DEFAULT_MASTERS;
 
   const handleLogin = (c: any) => {
+    const isNew = !loadClient();
     saveClient(c);
     setClient(c);
+    if (isNew) {
+      // Уведомляем владельца о новой регистрации
+      adminPost("notify_owner", {
+        event_type: "new_client",
+        message: `Girly Paradise: новый клиент зарегистрировался! ${c.name}, тел: ${c.phone}`,
+      }).catch(() => {});
+    }
   };
 
   const handleLogout = () => {
@@ -122,6 +184,12 @@ export default function Index() {
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "linear-gradient(135deg, #fff5f7 0%, #fce4ec 30%, #fdf6f8 60%, #fff0f3 100%)" }}>
+      {/* Надпись в углу */}
+      <div className="fixed top-2 left-2 z-50 pointer-events-none">
+        <span className="text-[9px] font-medium tracking-wide opacity-40" style={{ color: "hsl(335 50% 45%)" }}>
+          приложение для онлайн записи
+        </span>
+      </div>
       {/* Floating sparkles */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full opacity-20"
@@ -1024,6 +1092,11 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
       window.open(link.url, "_blank");
     }
     setShowShare(false);
+    // Уведомляем владельца о поделиться
+    adminPost("notify_owner", {
+      event_type: "share",
+      message: `Girly Paradise: клиент ${client.name} поделился сайтом через ${link.label}!`,
+    }).catch(() => {});
   };
 
   // Добавить на экран
@@ -1213,7 +1286,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1254,6 +1327,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
     { id: "masters_edit", icon: "UserCircle", label: "Мастера", color: "from-rose-400 to-pink-500", ownerOnly: true },
     { id: "broadcast", icon: "Send", label: "Рассылка", color: "from-sky-500 to-blue-500", ownerOnly: true },
+    { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
     { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
   ];
@@ -1334,9 +1408,126 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
       {section === "masters_edit" && isOwner && <AdminMastersEditor />}
       {section === "broadcast" && isOwner && <AdminBroadcast />}
+      {section === "documents" && isOwner && <AdminDocuments />}
       {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
       {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
+    </div>
+  );
+}
+
+// ── Документы и сертификаты ──
+function AdminDocuments() {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title: "", description: "", file_url: "", doc_type: "certificate" });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const load = () => adminPost("documents").then(d => { setDocs(d.documents || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.title || !form.file_url) return;
+    setSaving(true);
+    await adminPost("documents", { action: "add", ...form });
+    setForm({ title: "", description: "", file_url: "", doc_type: "certificate" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const toggle = async (id: number) => { await adminPost("documents", { action: "toggle", id }); load(); };
+
+  const DOC_TYPES = [
+    { id: "certificate", label: "Сертификат" },
+    { id: "license", label: "Лицензия" },
+    { id: "diploma", label: "Диплом" },
+    { id: "other", label: "Другое" },
+  ];
+
+  const isImg = (url: string) => /\.(jpg|jpeg|png|webp|gif)/i.test(url);
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-3" style={PS}>Сертификаты и документы отображаются клиентам на сайте</p>
+      {!adding && (
+        <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+          + Добавить документ
+        </button>
+      )}
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Название</label>
+            <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+              placeholder="Сертификат косметолога" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Описание (необязательно)</label>
+            <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Выдан в 2024 году" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Тип</label>
+            <div className="flex gap-2 flex-wrap">
+              {DOC_TYPES.map(t => (
+                <button key={t.id} onClick={() => setForm(p => ({ ...p, doc_type: t.id }))}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium"
+                  style={form.doc_type === t.id ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Фото/скан документа</label>
+            <PhotoUploadButton folder="documents" label="📷 Загрузить с телефона" uploading={uploading}
+              setUploading={setUploading} onUploaded={url => setForm(p => ({ ...p, file_url: url }))} className="w-full mb-2" />
+            {form.file_url && isImg(form.file_url) && (
+              <img src={form.file_url} className="w-full h-44 object-cover rounded-xl mt-2" alt="preview" />
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving || uploading || !form.title || !form.file_url}
+              className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              {saving ? "Сохраняем..." : "Добавить"}
+            </button>
+            <button onClick={() => { setAdding(false); setForm({ title: "", description: "", file_url: "", doc_type: "certificate" }); }}
+              className="px-4 py-3 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-3">
+        {docs.map(doc => (
+          <div key={doc.id} className="card-glow rounded-2xl overflow-hidden" style={!doc.is_active ? { opacity: 0.5 } : {}}>
+            {isImg(doc.file_url) && (
+              <img src={doc.file_url} className="w-full h-40 object-cover" alt={doc.title} />
+            )}
+            <div className="p-4 flex items-start gap-3">
+              <div className="flex-1">
+                <div className="font-semibold text-sm" style={P}>{doc.title}</div>
+                <div className="text-xs mt-0.5" style={PS}>{DOC_TYPES.find(t => t.id === doc.doc_type)?.label}</div>
+                {doc.description && <div className="text-xs mt-1" style={PS}>{doc.description}</div>}
+              </div>
+              <button onClick={() => toggle(doc.id)} className="px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
+                style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                {doc.is_active ? "Скрыть" : "Показать"}
+              </button>
+            </div>
+          </div>
+        ))}
+        {!loading && docs.length === 0 && (
+          <div className="text-center py-10">
+            <div className="text-4xl mb-3">📄</div>
+            <p className="text-sm" style={PS}>Документов пока нет</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2310,6 +2501,8 @@ function AdminGalleryFolders() {
   const [photos, setPhotos] = useState<any[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
   const loadFolders = () => adminPost("gallery_folders").then(d => { setFolders(d.folders || []); setLoading(false); });
@@ -2355,8 +2548,18 @@ function AdminGalleryFolders() {
       </button>
       {addingPhoto && (
         <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          {/* Загрузка с телефона */}
+          <PhotoUploadButton
+            folder="gallery"
+            label="📷 Выбрать фото из галереи"
+            uploading={uploadingPhoto}
+            setUploading={setUploadingPhoto}
+            onUploaded={url => setPhotoForm(p => ({ ...p, url }))}
+            className="w-full"
+          />
+          {/* Или по ссылке */}
           <div>
-            <label className="text-xs font-medium block mb-1" style={PS}>Ссылка на фото (URL)</label>
+            <label className="text-xs font-medium block mb-1" style={PS}>или вставить ссылку (URL)</label>
             <input value={photoForm.url} onChange={e => setPhotoForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..."
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
           </div>
@@ -2366,7 +2569,7 @@ function AdminGalleryFolders() {
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
           </div>
           {photoForm.url && <img src={photoForm.url} className="w-full h-40 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
-          <button onClick={addPhoto} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          <button onClick={addPhoto} disabled={saving || uploadingPhoto || !photoForm.url} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
             {saving ? "Добавляем..." : "Добавить фото"}
           </button>
         </div>
@@ -2397,14 +2600,20 @@ function AdminGalleryFolders() {
       </button>
       {addingFolder && (
         <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
-          {[{ key: "name", label: "Название папки", ph: "До и после, Лицо, Тело..." }, { key: "description", label: "Описание", ph: "Необязательно" }, { key: "cover_url", label: "URL обложки", ph: "https://..." }].map(f => (
+          {[{ key: "name", label: "Название папки", ph: "До и после, Лицо, Тело..." }, { key: "description", label: "Описание", ph: "Необязательно" }].map(f => (
             <div key={f.key}>
               <label className="text-xs font-medium block mb-1" style={PS}>{f.label}</label>
               <input value={(folderForm as any)[f.key]} onChange={e => setFolderForm(p => ({ ...p, [f.key]: e.target.value }))}
                 placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
             </div>
           ))}
-          <button onClick={addFolder} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Обложка папки</label>
+            <PhotoUploadButton folder="gallery" label="📷 Выбрать обложку" uploading={uploadingCover} setUploading={setUploadingCover}
+              onUploaded={url => setFolderForm(p => ({ ...p, cover_url: url }))} className="w-full" />
+            {folderForm.cover_url && <img src={folderForm.cover_url} className="w-full h-28 object-cover rounded-xl mt-2" alt="cover" />}
+          </div>
+          <button onClick={addFolder} disabled={saving || uploadingCover} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
             {saving ? "Создаём..." : "Создать"}
           </button>
         </div>
@@ -2436,6 +2645,7 @@ function AdminPricelistEditor() {
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState({ name: "", category: "", price: "", duration: "", description: "", photo_url: "" });
   const [saving, setSaving] = useState(false);
+  const [uploadingServicePhoto, setUploadingServicePhoto] = useState(false);
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
   const cats = ["Криолиполиз", "Лицо", "Тело", "Волосы", "СПА", "РФ-лифтинг", "Другое"];
 
@@ -2470,14 +2680,19 @@ function AdminPricelistEditor() {
 
   const FormBlock = () => (
     <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
-      {[{ k: "name", l: "Название услуги", ph: "Криолиполиз 2 зоны" }, { k: "price", l: "Цена", ph: "3 500 ₽" }, { k: "duration", l: "Длительность", ph: "60 мин" }, { k: "photo_url", l: "Фото (URL)", ph: "https://..." }, { k: "description", l: "Описание", ph: "Необязательно" }].map(f => (
+      {[{ k: "name", l: "Название услуги", ph: "Криолиполиз 2 зоны" }, { k: "price", l: "Цена", ph: "3 500 ₽" }, { k: "duration", l: "Длительность", ph: "60 мин" }, { k: "description", l: "Описание", ph: "Необязательно" }].map(f => (
         <div key={f.k}>
           <label className="text-xs font-medium block mb-1" style={PS}>{f.l}</label>
           <input value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
             placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
         </div>
       ))}
-      {form.photo_url && <img src={form.photo_url} className="w-full h-36 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
+      <div>
+        <label className="text-xs font-medium block mb-1" style={PS}>Фото услуги</label>
+        <PhotoUploadButton folder="pricelist" label="📷 Выбрать фото из галереи" uploading={uploadingServicePhoto}
+          setUploading={setUploadingServicePhoto} onUploaded={url => setForm(p => ({ ...p, photo_url: url }))} className="w-full mb-2" />
+        {form.photo_url && <img src={form.photo_url} className="w-full h-36 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
+      </div>
       <div>
         <label className="text-xs font-medium block mb-1" style={PS}>Категория</label>
         <div className="flex flex-wrap gap-2">
