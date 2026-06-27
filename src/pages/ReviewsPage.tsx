@@ -266,60 +266,68 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
           onClick={() => setShowForm(false)}>
-          <div className="w-full max-w-lg rounded-t-3xl p-6 space-y-4" style={{ background: "white" }}
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "white", maxHeight: "92vh" }}
             onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-xl font-oswald font-bold" style={{ color: textDark }}>Ваш отзыв</h2>
-              <button onClick={() => setShowForm(false)} style={{ color: textMid }}>✕</button>
-            </div>
 
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider block mb-2" style={{ color: textMid }}>Оценка</label>
-              <div className="flex gap-2">
+            {/* Шапка с кнопкой отправки — всегда видна */}
+            <div className="px-6 pt-5 pb-4 flex-shrink-0 border-b" style={{ borderColor: "hsl(335 30% 92%)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-oswald font-bold" style={{ color: textDark }}>Ваш отзыв</h2>
+                <button onClick={() => setShowForm(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: "hsl(335 20% 93%)", color: textMid }}>✕</button>
+              </div>
+              {/* Звёзды в шапке */}
+              <div className="flex gap-2 mb-3">
                 {[1,2,3,4,5].map(s => (
                   <button key={s} onClick={() => setRating(s)}
-                    style={{ fontSize: 28, color: s <= rating ? "#f59e0b" : "hsl(335 20% 85%)" }}>★</button>
+                    style={{ fontSize: 32, color: s <= rating ? "#f59e0b" : "hsl(335 20% 85%)" }}>★</button>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Ваше имя *</label>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Имя"
-                className="w-full px-4 py-3 rounded-xl outline-none text-sm"
-                style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Услуга</label>
-              <select value={service} onChange={e => setService(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl outline-none text-sm"
-                style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }}>
-                {SERVICES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Отзыв *</label>
-              <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Поделитесь впечатлением..." rows={3}
-                className="w-full px-4 py-3 rounded-xl outline-none text-sm resize-none"
-                style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
-            </div>
-
-            <div>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-              <button onClick={() => fileRef.current?.click()}
-                className="w-full py-2.5 rounded-xl text-sm font-medium"
-                style={{ background: "hsl(335 30% 96%)", color: "hsl(335 50% 50%)", border: `1px dashed ${pinkBorder}` }}>
-                {photo ? `📷 ${photo.name}` : "📷 Добавить фото (необязательно)"}
+              {/* Кнопка отправить — всегда вверху */}
+              <button onClick={submit} disabled={sending || !name.trim() || !text.trim()}
+                className="w-full py-3.5 rounded-2xl font-bold text-base shadow-md transition-all"
+                style={name.trim() && text.trim()
+                  ? { ...GRAD, color: "white" }
+                  : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+                {sending ? "Отправляем..." : "Опубликовать отзыв ✓"}
               </button>
             </div>
 
-            <button onClick={submit} disabled={sending || !name.trim() || !text.trim()}
-              className="w-full py-4 rounded-2xl font-semibold text-white text-base shadow-lg"
-              style={name.trim() && text.trim() ? GRAD : { background: "hsl(335 20% 88%)", color: "hsl(335 20% 65%)" }}>
-              {sending ? "Отправляем..." : "Опубликовать отзыв"}
-            </button>
+            {/* Поля — скроллируются */}
+            <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 pb-8">
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Ваше имя *</label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Имя"
+                  className="w-full px-4 py-3 rounded-xl outline-none text-sm"
+                  style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Услуга</label>
+                <select value={service} onChange={e => setService(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl outline-none text-sm"
+                  style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }}>
+                  {SERVICES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Отзыв *</label>
+                <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Поделитесь впечатлением..." rows={4}
+                  className="w-full px-4 py-3 rounded-xl outline-none text-sm resize-none"
+                  style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
+              </div>
+
+              <div>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+                <button onClick={() => fileRef.current?.click()}
+                  className="w-full py-2.5 rounded-xl text-sm font-medium"
+                  style={{ background: "hsl(335 30% 96%)", color: "hsl(335 50% 50%)", border: `1px dashed ${pinkBorder}` }}>
+                  {photo ? `📷 ${photo.name}` : "📷 Добавить фото (необязательно)"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
