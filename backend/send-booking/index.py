@@ -122,19 +122,21 @@ def handler(event: dict, context) -> dict:
     </div>
     """
 
+    booking_date_iso = body.get("booking_date_iso", day)  # ISO YYYY-MM-DD или текст
+
     # Сохраняем в расписание БД
     try:
         conn = psycopg2.connect(os.environ["DATABASE_URL"])
         cur = conn.cursor()
         cur.execute(f"""
-            INSERT INTO {SCHEMA}.schedule (client_name, client_phone, services, master, booking_date, booking_time, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'confirmed')
-        """, (name, phone, service, master, day, time))
+            INSERT INTO {SCHEMA}.schedule (client_name, client_phone, services, master, booking_date, booking_time, status, is_seen)
+            VALUES (%s, %s, %s, %s, %s, %s, 'confirmed', false)
+        """, (name, phone, service, master, booking_date_iso, time))
         # Также в bookings
         cur.execute(f"""
             INSERT INTO {SCHEMA}.bookings (client_name, client_phone, client_email, service, master, booking_date, booking_time, price, status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'new')
-        """, (name, phone, client_email, service, master, day, time, price if price else 0))
+        """, (name, phone, client_email, service, master, booking_date_iso, time, price if price else 0))
         conn.commit()
         conn.close()
     except Exception:

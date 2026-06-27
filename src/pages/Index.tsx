@@ -424,8 +424,7 @@ const DEFAULT_MASTERS = [
   { id: 1, name: "Галина Сиплатова", spec: "Косметолог-эстетист", rating: 5.0, reviews_count: 0, img: GALINA_IMG, tags: ["СМАС-лифтинг", "Биоревитализация", "РФ-лифтинг", "Криолиполиз"] },
 ];
 
-const timeSlots = ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
-const busySlots = ["10:00", "13:00", "15:00", "18:00"];
+const timeSlots = ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
 
 function getWeekDays() {
   const days = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
@@ -461,6 +460,8 @@ export default function Index() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookingStep, setBookingStep] = useState(1);
   const [bookingDone, setBookingDone] = useState(false);
+  // Занятые слоты: { "2026-06-28": ["11:00","14:00"], ... }
+  const [scheduledSlots, setScheduledSlots] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     // Звук приветствия при открытии сайта (если клиент залогинен)
@@ -498,11 +499,34 @@ export default function Index() {
         setDynamicServices(d.items.map(priceItemToService));
       }
     }).catch(() => {});
+
+    // Загружаем занятые слоты из расписания
+    adminPost("schedule").then(d => {
+      const slots: Record<string, string[]> = {};
+      (d.schedule || []).forEach((item: any) => {
+        const date = item.booking_date?.slice(0, 10);
+        const time = item.booking_time?.slice(0, 5);
+        if (date && time) {
+          if (!slots[date]) slots[date] = [];
+          slots[date].push(time);
+        }
+      });
+      setScheduledSlots(slots);
+    }).catch(() => {});
   }, []);
 
   const masters = dynamicMasters.length > 0 ? dynamicMasters : DEFAULT_MASTERS;
-  // Услуги для записи = прайс, если загрузился; иначе пусто (покажем состояние загрузки)
   const bookingServices = dynamicServices;
+  // Занятые слоты для выбранного дня
+  const getBusySlotsForDay = (dayIdx: number): string[] => {
+    const d = weekDays[dayIdx];
+    if (!d) return [];
+    const y = d.full.getFullYear();
+    const m = String(d.full.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.full.getDate()).padStart(2, "0");
+    const dateStr = `${y}-${m}-${dd}`;
+    return scheduledSlots[dateStr] || [];
+  };
 
   const handleLogin = (c: any) => {
     const isNew = !loadClient();
@@ -614,7 +638,7 @@ export default function Index() {
             masters={masters}
             weekDays={weekDays}
             timeSlots={timeSlots}
-            busySlots={busySlots}
+            busySlots={getBusySlotsForDay(selectedDay)}
             setPage={setPage}
             client={client}
           />
@@ -1073,6 +1097,10 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
     try {
       const dayInfo = wDays[selectedDay];
       const serviceNames = selectedServices.map((s: any) => s.name).join(", ");
+      // ISO-дата для синхронизации с расписанием
+      const isoDate = dayInfo?.full
+        ? `${dayInfo.full.getFullYear()}-${String(dayInfo.full.getMonth()+1).padStart(2,"0")}-${String(dayInfo.full.getDate()).padStart(2,"0")}`
+        : "";
       await fetch(SEND_BOOKING_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1082,6 +1110,7 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
           service: serviceNames,
           master: selectedMaster?.name || "Любой свободный",
           day: `${dayInfo?.day}, ${dayInfo?.date} ${dayInfo?.month}`,
+          booking_date_iso: isoDate,
           time: selectedTime,
           price: 0,
         }),
@@ -2093,9 +2122,32 @@ function AdminPage({ onBack }: { onBack: () => void }) {
   const [adminUser, setAdminUser] = useState<any>(loadAdminSession());
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [stats, setStats] = useState<any>(null);
-  const [badges, setBadges] = useState<{ unread_msgs: number; new_orders: number }>({ unread_msgs: 0, new_orders: 0 });
+  const [badges, setBadges] = useState<{ unread_msgs: number; new_orders: number; new_bookings: number }>({ unread_msgs: 0, new_orders: 0, new_bookings: 0 });
+  const prevNewBookings = React.useRef(0);
 
-  const loadBadges = () => adminPost("badge_counts").then(d => setBadges(d)).catch(() => {});
+  const loadBadges = () => adminPost("badge_counts").then(d => {
+    setBadges(d);
+    // Звук при появлении новой записи
+    if (d.new_bookings > prevNewBookings.current && prevNewBookings.current >= 0) {
+      if (prevNewBookings.current < d.new_bookings) {
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          [[523, 0], [659, 0.15], [784, 0.30]].forEach(([freq, delay]) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = "sine"; osc.frequency.value = freq;
+            const t = ctx.currentTime + delay;
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+            osc.start(t); osc.stop(t + 0.55);
+          });
+        } catch { /* silent */ }
+      }
+    }
+    prevNewBookings.current = d.new_bookings;
+  }).catch(() => {});
 
   useEffect(() => {
     if (adminUser) {
@@ -2151,11 +2203,26 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
+          {/* Новые записи — баннер при наличии */}
+          {badges.new_bookings > 0 && (
+            <button
+              onClick={() => { setSection("schedule"); adminPost("badge_counts", { action: "mark_bookings_seen" }); setBadges(b => ({ ...b, new_bookings: 0 })); }}
+              className="w-full py-3.5 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2.5 text-sm mb-3 relative animate-pulse"
+              style={{ background: "linear-gradient(135deg, hsl(142 70% 42%), hsl(160 65% 38%))", color: "white", boxShadow: "0 4px 16px hsl(142 70% 50% / 0.4)" }}>
+              <Icon name="CalendarCheck" size={18} className="text-white" />
+              {badges.new_bookings === 1 ? "1 новая запись!" : `${badges.new_bookings} новых записи!`}
+              <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center text-white"
+                style={{ background: "hsl(0 80% 55%)" }}>
+                {badges.new_bookings}
+              </span>
+            </button>
+          )}
+
           {/* Кнопки главных действий */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <button
               onClick={() => setSection("schedule")}
-              className="py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-sm"
+              className="py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-sm relative"
               style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 16px hsl(335 80% 65% / 0.4)" }}>
               <Icon name="CalendarPlus" size={18} className="text-white" />
               Записать клиента

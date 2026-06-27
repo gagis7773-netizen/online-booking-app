@@ -1,0 +1,1 @@
+ALTER TABLE t_p3248579_online_booking_app.schedule ADD COLUMN IF NOT EXISTS is_seen boolean NOT NULL DEFAULT false;

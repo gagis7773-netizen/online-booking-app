@@ -734,9 +734,12 @@ def handler(event: dict, context) -> dict:
             o["items"] = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"orders": orders})
 
-    # ── СЧЁТЧИКИ БЕЙДЖЕЙ (сообщения + заказы) ──
+    # ── СЧЁТЧИКИ БЕЙДЖЕЙ (сообщения + заказы + новые записи) ──
     if section == "badge_counts":
-        # Непрочитанные сообщения (чаты без ответа от клиентов за последние 24ч)
+        if body.get("action") == "mark_bookings_seen":
+            cur.execute(f"UPDATE {SCHEMA}.schedule SET is_seen = true WHERE is_seen = false")
+            conn.commit(); conn.close(); return resp({"ok": True})
+        # Непрочитанные сообщения
         try:
             cur.execute(f"""
                 SELECT COUNT(DISTINCT c.id) as unread_msgs
@@ -755,7 +758,13 @@ def handler(event: dict, context) -> dict:
             new_orders = int(cur.fetchone()["cnt"] or 0)
         except Exception:
             new_orders = 0
-        conn.close(); return resp({"unread_msgs": unread_msgs, "new_orders": new_orders})
+        # Новые записи (не просмотренные)
+        try:
+            cur.execute(f"SELECT COUNT(*) as cnt FROM {SCHEMA}.schedule WHERE is_seen = false")
+            new_bookings = int(cur.fetchone()["cnt"] or 0)
+        except Exception:
+            new_bookings = 0
+        conn.close(); return resp({"unread_msgs": unread_msgs, "new_orders": new_orders, "new_bookings": new_bookings})
 
     # ── БАННЕРЫ/РЕКЛАМА МАГАЗИНА ──
     if section == "shop_banners":
