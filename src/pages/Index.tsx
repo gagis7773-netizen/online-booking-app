@@ -762,23 +762,23 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img", hKey: "section_pricelist_h" },
-            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img", hKey: "section_gallery_h" },
-            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img", hKey: "section_reviews_h" },
-            { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img", hKey: "section_documents_h" },
+            { defaultLabel: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img", hKey: "section_pricelist_h", nameKey: "section_pricelist_name" },
+            { defaultLabel: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img", hKey: "section_gallery_h", nameKey: "section_gallery_name" },
+            { defaultLabel: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img", hKey: "section_reviews_h", nameKey: "section_reviews_name" },
+            { defaultLabel: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img", hKey: "section_documents_h", nameKey: "section_documents_name" },
           ].map(item => {
             const img = siteSettings[item.imgKey];
-            // Индивидуальная высота карточки или глобальная из настроек
+            const label = siteSettings[item.nameKey] || item.defaultLabel;
             const h = Number(siteSettings[item.hKey] || siteSettings.section_card_height || 140);
             return (
               <button key={item.page} onClick={() => navigateTo(item.page)}
                 className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
                 {img ? (
                   <div className="relative" style={{ height: h }}>
-                    <img src={img} alt={item.label} className="w-full h-full object-cover" />
+                    <img src={img} alt={label} className="w-full h-full object-cover" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 30%, rgba(255,235,242,0.92) 100%)" }} />
                     <div className="absolute bottom-2 left-3">
-                      <div className="font-semibold text-xs" style={{ color: "hsl(335 50% 28%)" }}>{item.label}</div>
+                      <div className="font-semibold text-xs" style={{ color: "hsl(335 50% 28%)" }}>{label}</div>
                       <div className="text-[10px]" style={{ color: "hsl(335 30% 55%)" }}>{item.sub}</div>
                     </div>
                   </div>
@@ -788,7 +788,7 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
                       style={{ background: "hsl(335 80% 60% / 0.1)", border: "1px solid hsl(335 70% 85%)" }}>
                       <Icon name={item.icon as any} size={18} style={{ color: "hsl(335 75% 52%)" }} />
                     </div>
-                    <div className="font-semibold text-sm mb-0.5" style={{ color: "hsl(335 50% 30%)" }}>{item.label}</div>
+                    <div className="font-semibold text-sm mb-0.5" style={{ color: "hsl(335 50% 30%)" }}>{label}</div>
                     <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{item.sub}</div>
                   </div>
                 )}
@@ -3278,7 +3278,11 @@ function AdminSchedule() {
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
-                            <div className="text-xs" style={PS}>{item.booking_time} · {item.services}</div>
+                            <div className="text-xs flex flex-wrap gap-x-2" style={PS}>
+                              <span>{item.booking_time}</span>
+                              {item.duration && <span style={{ color: "hsl(335 70% 50%)" }}>⏱ {item.duration} мин</span>}
+                              {item.services && <span className="truncate max-w-[160px]">{item.services}</span>}
+                            </div>
                             {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
                           </div>
                           <button onClick={() => del(item.id)} className="px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
@@ -5332,6 +5336,7 @@ function AdminNotificationTemplates() {
 
 // ── Оформление сайта ──
 function AdminSiteSettings() {
+  const [tab, setTab] = useState<"design" | "sections" | "documents">("design");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -5356,8 +5361,104 @@ function AdminSiteSettings() {
 
   if (loading) return <div className="text-center py-12"><div className="text-3xl animate-float">🌸</div></div>;
 
+  const SECTION_CARDS = [
+    { key: "pricelist", label: "Прайс-лист",  imgKey: "section_pricelist_img",  hKey: "section_pricelist_h",  nameKey: "section_pricelist_name" },
+    { key: "gallery",   label: "Галерея",      imgKey: "section_gallery_img",    hKey: "section_gallery_h",    nameKey: "section_gallery_name" },
+    { key: "reviews",   label: "Отзывы",       imgKey: "section_reviews_img",    hKey: "section_reviews_h",    nameKey: "section_reviews_name" },
+    { key: "documents", label: "Документы",    imgKey: "section_documents_img",  hKey: "section_documents_h",  nameKey: "section_documents_name" },
+  ];
+
   return (
-    <div className="px-4 pb-6 space-y-5">
+    <div className="pb-6">
+      {/* Вкладки */}
+      <div className="px-4 mb-4">
+        <div className="grid grid-cols-3 gap-0.5 rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+          {([
+            { id: "design",    label: "Дизайн" },
+            { id: "sections",  label: "Разделы" },
+            { id: "documents", label: "Документы" },
+          ] as const).map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="py-2.5 text-xs font-semibold transition-all"
+              style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── ВКЛАДКА: РАЗДЕЛЫ ── */}
+      {tab === "sections" && (
+        <div className="px-4 space-y-4">
+          <p className="text-xs" style={PS}>Управляй карточками в блоке «Разделы» на главной: включай/выключай, меняй название и фото.</p>
+
+          {SECTION_CARDS.map(f => (
+            <div key={f.key} className="card-glow rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                {/* Тоггл вкл/выкл */}
+                <button
+                  onClick={() => { set(`section_${f.key}_hidden`, settings[`section_${f.key}_hidden`] === "true" ? "false" : "true"); saveAll(); }}
+                  className="w-11 h-6 rounded-full transition-all relative flex-shrink-0"
+                  style={{ background: settings[`section_${f.key}_hidden`] === "true" ? "hsl(335 20% 82%)" : "hsl(335 80% 58%)" }}>
+                  <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+                    style={{ left: settings[`section_${f.key}_hidden`] === "true" ? 2 : 24 }} />
+                </button>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold mb-1" style={P}>{f.label}</div>
+                  {/* Переименование */}
+                  <input
+                    value={settings[f.nameKey] || ""}
+                    onChange={e => set(f.nameKey, e.target.value)}
+                    onBlur={saveAll}
+                    placeholder={f.label}
+                    className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none"
+                    style={inp} />
+                </div>
+              </div>
+              {/* Фото */}
+              <SectionPhotoUpload
+                settingKey={f.imgKey}
+                currentUrl={settings[f.imgKey]}
+                onSaved={(key, url) => setSettings(prev => ({ ...prev, [key]: url }))}
+              />
+              {/* Высота */}
+              {settings[f.imgKey] && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs" style={PS}>Высота карточки</span>
+                    <span className="text-xs font-medium" style={P}>{settings[f.hKey] || "140"}px</span>
+                  </div>
+                  <input type="range" min="60" max="280" step="4"
+                    value={settings[f.hKey] || "140"}
+                    onChange={e => set(f.hKey, e.target.value)}
+                    className="w-full accent-pink-500" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Вкл/выкл разделы сайта (AdminSectionsEditor встроен) */}
+          <div className="card-glow rounded-2xl p-4">
+            <div className="font-semibold text-sm mb-3" style={P}>Дополнительные разделы</div>
+            <AdminSectionsEditor />
+          </div>
+
+          <button onClick={saveAll} disabled={saving} className="w-full py-3 rounded-2xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "💾 Сохранить разделы"}
+          </button>
+          {saved && <div className="p-3 rounded-xl text-sm text-center" style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>✓ Сохранено</div>}
+        </div>
+      )}
+
+      {/* ── ВКЛАДКА: ДОКУМЕНТЫ ── */}
+      {tab === "documents" && (
+        <div className="px-4">
+          <AdminDocuments />
+        </div>
+      )}
+
+      {/* ── ВКЛАДКА: ДИЗАЙН ── */}
+      {tab === "design" && <div className="px-4 space-y-5">
       {/* Цвет главного экрана */}
       <div className="card-glow rounded-2xl p-4">
         <div className="font-semibold text-sm mb-3" style={P}>Цвет главного экрана</div>
@@ -5456,45 +5557,6 @@ function AdminSiteSettings() {
         <button onClick={saveAll} disabled={saving}
           className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
           {saving ? "Сохраняем..." : "💾 Сохранить фото салона"}
-        </button>
-      </div>
-
-      {/* Фото разделов */}
-      <div className="card-glow rounded-2xl p-4 space-y-4">
-        <div className="font-semibold text-sm" style={P}>Фото разделов</div>
-        <p className="text-xs" style={PS}>Фото вместо иконок в блоке «Разделы» на главной. После загрузки сохраняется автоматически.</p>
-        {[
-          { key: "section_pricelist_img", label: "Прайс-лист", hKey: "section_pricelist_h" },
-          { key: "section_gallery_img", label: "Галерея", hKey: "section_gallery_h" },
-          { key: "section_reviews_img", label: "Отзывы", hKey: "section_reviews_h" },
-          { key: "section_documents_img", label: "Документы", hKey: "section_documents_h" },
-        ].map(f => (
-          <div key={f.key} className="rounded-xl p-3 space-y-2" style={{ background: "hsl(335 50% 98%)", border: "1px solid hsl(335 40% 92%)" }}>
-            <div className="text-xs font-semibold" style={P}>{f.label}</div>
-            {/* Новый SectionPhotoUpload — сохраняет в БД сам, не вызывает ре-рендер */}
-            <SectionPhotoUpload
-              settingKey={f.key}
-              currentUrl={settings[f.key]}
-              onSaved={(key, url) => setSettings(prev => ({ ...prev, [key]: url }))}
-            />
-            {settings[f.key] && (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs" style={PS}>Высота карточки</span>
-                  <span className="text-xs font-medium" style={P}>{settings[f.hKey] || "96"}px</span>
-                </div>
-                <input type="range" min="60" max="200" step="4"
-                  value={settings[f.hKey] || "96"}
-                  onChange={e => set(f.hKey, e.target.value)}
-                  className="w-full accent-pink-500" />
-              </div>
-            )}
-          </div>
-        ))}
-        {/* Кнопка для сохранения высот карточек */}
-        <button onClick={saveAll} disabled={saving}
-          className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
-          {saving ? "Сохраняем..." : "💾 Сохранить высоты карточек"}
         </button>
       </div>
 
@@ -5680,6 +5742,7 @@ function AdminSiteSettings() {
       <button onClick={saveAll} disabled={saving} className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg" style={GRAD}>
         {saving ? "Сохраняем..." : "💾 Сохранить всё"}
       </button>
+    </div>}
     </div>
   );
 }
