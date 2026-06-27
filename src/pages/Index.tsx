@@ -1861,6 +1861,29 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
           </div>
         )}
 
+        {/* Форма отзыва — сразу под кнопками */}
+        {showReview && (
+          <div className="card-glow rounded-2xl p-4 mb-4 animate-slide-up">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium" style={{ color: "hsl(335 40% 55%)" }}>Ваш отзыв:</p>
+              <button onClick={() => setShowReview(false)} className="w-6 h-6 flex items-center justify-center rounded-full"
+                style={{ background: "hsl(335 20% 92%)", color: "hsl(335 40% 60%)" }}>
+                <Icon name="X" size={12} />
+              </button>
+            </div>
+            <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} rows={3}
+              placeholder="Расскажите о вашем визите..."
+              autoFocus
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none mb-3"
+              style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+            <button onClick={handleSendReview} disabled={!reviewText.trim()}
+              className="w-full py-3 rounded-xl font-semibold text-white text-sm"
+              style={reviewText.trim() ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" } : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+              {reviewSent ? "Спасибо! ✓" : "Отправить отзыв"}
+            </button>
+          </div>
+        )}
+
         {/* Поделиться — выбор мессенджера */}
         {showShare && (
           <div className="card-glow rounded-2xl p-4 mb-4 animate-slide-up">
@@ -1875,22 +1898,6 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Форма отзыва */}
-        {showReview && (
-          <div className="card-glow rounded-2xl p-4 mb-4 animate-slide-up">
-            <p className="text-xs font-medium mb-2" style={{ color: "hsl(335 40% 55%)" }}>Ваш отзыв:</p>
-            <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} rows={3}
-              placeholder="Расскажите о вашем визите..."
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none mb-3"
-              style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
-            <button onClick={handleSendReview} disabled={!reviewText.trim()}
-              className="w-full py-3 rounded-xl font-semibold text-white text-sm"
-              style={reviewText.trim() ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" } : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
-              {reviewSent ? "Спасибо! ✓" : "Отправить отзыв"}
-            </button>
           </div>
         )}
 
