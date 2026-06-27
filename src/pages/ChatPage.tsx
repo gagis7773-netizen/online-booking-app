@@ -10,7 +10,7 @@ const pinkBorder = "hsl(335 50% 85%)";
 const textDark = "hsl(335 50% 25%)";
 const textMid = "hsl(335 30% 55%)";
 
-export default function ChatPage() {
+export default function ChatPage({ onBack }: { onBack?: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [chatId, setChatId] = useState<number | null>(null);
@@ -135,14 +135,19 @@ export default function ChatPage() {
     <div className="flex flex-col animate-fade-in" style={{ height: "calc(100vh - 80px)" }}>
       {/* Header */}
       <div className="px-4 pt-10 pb-3 flex items-center gap-3 border-b" style={{ borderColor: pinkBorder, background: "rgba(255,255,255,0.9)" }}>
-        <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))` }}>
+        {onBack && (
+          <button onClick={onBack} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: pinkBg }}>
+            <Icon name="ChevronLeft" size={18} style={{ color: pink }} />
+          </button>
+        )}
+        <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0" style={{ background: `linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))` }}>
           🌸
         </div>
-        <div>
+        <div className="flex-1">
           <div className="font-semibold text-sm" style={{ color: textDark }}>Girly Paradise</div>
           <div className="text-xs" style={{ color: textMid }}>Отвечаем в течение 1 часа</div>
         </div>
-        <button onClick={() => loadMessages(chatId!)} className="ml-auto p-2 rounded-xl" style={{ background: pinkBg }}>
+        <button onClick={() => loadMessages(chatId!)} className="p-2 rounded-xl" style={{ background: pinkBg }}>
           <Icon name="RefreshCw" size={16} style={{ color: pink }} />
         </button>
       </div>

@@ -412,5 +412,34 @@ def handler(event: dict, context) -> dict:
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"months": rows})
 
+    # ── МАСТЕРА ──
+    if section == "masters":
+        if body.get("action") == "add":
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.masters_custom (name, spec, rating, reviews_count, photo_url, tags, sort_order)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            """, (body.get("name",""), body.get("spec",""), float(body.get("rating",5.0)),
+                  int(body.get("reviews_count",0)), body.get("photo_url",""), body.get("tags",""), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]
+            conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "update":
+            cur.execute(f"""
+                UPDATE {SCHEMA}.masters_custom
+                SET name=%s, spec=%s, rating=%s, reviews_count=%s, photo_url=%s, tags=%s
+                WHERE id=%s
+            """, (body.get("name",""), body.get("spec",""), float(body.get("rating",5.0)),
+                  int(body.get("reviews_count",0)), body.get("photo_url",""), body.get("tags",""), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "toggle":
+            cur.execute(f"UPDATE {SCHEMA}.masters_custom SET is_active = NOT is_active WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        active_only = body.get("active_only", False)
+        if active_only:
+            cur.execute(f"SELECT * FROM {SCHEMA}.masters_custom WHERE is_active=true ORDER BY sort_order, id")
+        else:
+            cur.execute(f"SELECT * FROM {SCHEMA}.masters_custom ORDER BY sort_order, id")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"masters": rows})
+
     conn.close()
     return resp({"error": "Unknown section"}, 400)

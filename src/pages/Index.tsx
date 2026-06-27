@@ -34,8 +34,8 @@ const services = [
   { id: 12, name: "РФ-лифтинг тело и лицо", category: "Лицо", price: 0, duration: 60, icon: "Waves", color: "from-violet-500 to-purple-600" },
 ];
 
-const masters = [
-  { id: 1, name: "Галина Сиплатова", spec: "Косметолог-эстетист", rating: 5.0, reviews: 312, img: GALINA_IMG, tags: ["СМАС-лифтинг", "Биоревитализация", "РФ-лифтинг", "Криолиполиз"] },
+const DEFAULT_MASTERS = [
+  { id: 1, name: "Галина Сиплатова", spec: "Косметолог-эстетист", rating: 5.0, reviews_count: 0, img: GALINA_IMG, tags: ["СМАС-лифтинг", "Биоревитализация", "РФ-лифтинг", "Криолиполиз"] },
 ];
 
 const timeSlots = ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
@@ -66,12 +66,33 @@ function clearClient() { localStorage.removeItem("gp_client"); }
 export default function Index() {
   const [page, setPage] = useState<Page>("home");
   const [client, setClient] = useState<any>(loadClient());
+  const [dynamicMasters, setDynamicMasters] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<typeof services>([]);
-  const [selectedMaster, setSelectedMaster] = useState<typeof masters[0] | null>(null);
+  const [selectedMaster, setSelectedMaster] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookingStep, setBookingStep] = useState(1);
   const [bookingDone, setBookingDone] = useState(false);
+
+  useEffect(() => {
+    adminPost("masters", { active_only: true }).then(d => {
+      if (d.masters && d.masters.length > 0) {
+        setDynamicMasters(d.masters.map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          spec: m.spec || "",
+          rating: Number(m.rating) || 5.0,
+          reviews_count: m.reviews_count || 0,
+          img: m.photo_url || GALINA_IMG,
+          tags: m.tags ? m.tags.split(",").map((t: string) => t.trim()) : [],
+        })));
+      } else {
+        setDynamicMasters(DEFAULT_MASTERS);
+      }
+    }).catch(() => setDynamicMasters(DEFAULT_MASTERS));
+  }, []);
+
+  const masters = dynamicMasters.length > 0 ? dynamicMasters : DEFAULT_MASTERS;
 
   const handleLogin = (c: any) => {
     saveClient(c);
@@ -116,7 +137,7 @@ export default function Index() {
       </div>
 
       <div className="relative z-10 pb-24">
-        {page === "home" && <HomePage setPage={setPage} startBooking={startBooking} client={client} />}
+        {page === "home" && <HomePage setPage={setPage} startBooking={startBooking} client={client} masters={masters} />}
         {page === "pricelist" && <PriceListPage setPage={setPage} startBooking={startBooking} />}
         {page === "masters" && <MastersPage masters={masters} setPage={setPage} startBooking={startBooking} />}
         {page === "booking" && (
@@ -145,9 +166,9 @@ export default function Index() {
         {page === "profile" && (
           <ProfilePage client={client} onLogin={handleLogin} onLogout={handleLogout} setPage={setPage} />
         )}
-        {page === "reviews" && <ReviewsPage />}
+        {page === "reviews" && <ReviewsPage onBack={() => setPage("home")} />}
         {page === "gallery" && <ClientGalleryPage setPage={setPage} />}
-        {page === "chat" && <ChatPage />}
+        {page === "chat" && <ChatPage onBack={() => setPage("home")} />}
         {page === "admin" && <AdminPage onBack={() => setPage("home")} />}
       </div>
 
@@ -158,7 +179,7 @@ export default function Index() {
 
 // ─── HOME ───────────────────────────────────────────────────────────────────
 
-function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => void; startBooking: () => void; client: any }) {
+function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Page) => void; startBooking: () => void; client: any; masters: any[] }) {
   const [pressTimer, setPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLogoPress = () => {
@@ -191,7 +212,7 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
               <Icon name="Phone" size={11} />
               <span>+7 (904) 601-55-56</span>
             </a>
-            <a href="https://yandex.ru/maps/?text=Санкт-Петербург+ул+Заречная+10" target="_blank" rel="noopener noreferrer"
+            <a href="https://yandex.ru/maps/org/devchachiy_ray/46803820767?si=tk0bmt4ttr79ee9mkbgjgzmduc" target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
               style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 60% 50%)", border: "1px solid hsl(335 50% 85%)" }}>
               <Icon name="MapPin" size={11} />
@@ -201,7 +222,7 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <h1 className="text-4xl font-oswald font-bold leading-tight mb-3" style={{ color: "hsl(335 60% 30%)" }}>
-            Запишись<br /><span className="gradient-text">в один клик</span>
+            Онлайн запись<br /><span className="gradient-text">в один клик</span>
           </h1>
           <button
             onClick={startBooking}
@@ -230,7 +251,7 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
                 <div className="flex items-center gap-1">
                   <span className="text-yellow-500 text-xs">★</span>
                   <span className="text-xs font-medium" style={{ color: "hsl(335 50% 40%)" }}>{m.rating}</span>
-                  <span className="text-xs" style={{ color: "hsl(335 20% 65%)" }}>({m.reviews})</span>
+                  <span className="text-xs" style={{ color: "hsl(335 20% 65%)" }}>({m.reviews_count})</span>
                 </div>
               </div>
             </div>
@@ -343,6 +364,12 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
       <div className="relative h-44 overflow-hidden mb-4">
         <img src={PRICE_IMG} alt="Прайс-лист" className="w-full h-full object-cover" />
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(255,220,230,0.1) 0%, rgba(255,240,245,0.88) 100%)" }} />
+        <div className="absolute top-3 left-3">
+          <button onClick={() => setPage("home")} className="w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(8px)" }}>
+            <Icon name="ChevronLeft" size={18} style={{ color: "hsl(335 60% 40%)" }} />
+          </button>
+        </div>
         <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
           <h1 className="text-3xl font-oswald font-bold" style={{ color: "hsl(335 60% 28%)" }}>Прайс-лист 💅</h1>
           <p className="text-sm" style={{ color: "hsl(335 40% 50%)" }}>Все услуги и цены</p>
@@ -411,7 +438,7 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
 
 // ─── МАСТЕРА ────────────────────────────────────────────────────────────────
 
-type Master = { id: number; name: string; spec: string; rating: number; reviews: number; img: string; tags: string[] };
+type Master = { id: number; name: string; spec: string; rating: number; reviews_count: number; img: string; tags: string[] };
 
 function MastersPage({ masters: mList, setPage, startBooking }: { masters: Master[]; setPage: (p: Page) => void; startBooking: () => void }) {
   const [fullscreenImg, setFullscreenImg] = useState<string | null>(null);
@@ -426,9 +453,15 @@ function MastersPage({ masters: mList, setPage, startBooking }: { masters: Maste
         </div>
       )}
 
-      <div className="px-4 pt-12 pb-6">
-        <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Мастера 🌸</h1>
-        <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Профессионалы своего дела</p>
+      <div className="px-4 pt-12 pb-6 flex items-center gap-3">
+        <button onClick={() => setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+        </button>
+        <div>
+          <h1 className="text-3xl font-oswald font-bold mb-0.5" style={{ color: "hsl(335 60% 30%)" }}>Мастера 🌸</h1>
+          <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Профессионалы своего дела</p>
+        </div>
       </div>
       <div className="px-4 space-y-4">
         {mList.map((m, i) => (
@@ -452,7 +485,7 @@ function MastersPage({ masters: mList, setPage, startBooking }: { masters: Maste
                       <span className="text-yellow-500">★</span>
                       <span className="font-bold" style={{ color: "hsl(335 60% 30%)" }}>{m.rating}</span>
                     </div>
-                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{m.reviews} отзывов</div>
+                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{m.reviews_count > 0 ? `${m.reviews_count} отзывов` : "Нет отзывов"}</div>
                   </div>
                 </div>
               </div>
@@ -1180,7 +1213,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1219,6 +1252,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "expenses", icon: "Wallet", label: "Финансы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
+    { id: "masters_edit", icon: "UserCircle", label: "Мастера", color: "from-rose-400 to-pink-500", ownerOnly: true },
     { id: "broadcast", icon: "Send", label: "Рассылка", color: "from-sky-500 to-blue-500", ownerOnly: true },
     { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
@@ -1298,6 +1332,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "expenses" && isOwner && <AdminExpenses />}
       {section === "gallery" && <AdminGalleryFolders />}
       {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
+      {section === "masters_edit" && isOwner && <AdminMastersEditor />}
       {section === "broadcast" && isOwner && <AdminBroadcast />}
       {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
@@ -1440,12 +1475,194 @@ function AdminAnalytics() {
   );
 }
 
-// ── ПИН-ЭКРАН ──
+// ── Редактор мастеров ──
+function AdminMastersEditor() {
+  const [masters, setMasters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: "", spec: "", rating: "5.0", reviews_count: "0", photo_url: "", tags: "" });
+  const [saving, setSaving] = useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const load = () => adminPost("masters").then(d => { setMasters(d.masters || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const resetForm = () => setForm({ name: "", spec: "", rating: "5.0", reviews_count: "0", photo_url: "", tags: "" });
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setForm(p => ({ ...p, photo_url: ev.target?.result as string }));
+    reader.readAsDataURL(file);
+  };
+
+  const save = async () => {
+    if (!form.name) return;
+    setSaving(true);
+    const data = { ...form, rating: parseFloat(form.rating) || 5.0, reviews_count: parseInt(form.reviews_count) || 0 };
+    if (editing) {
+      await adminPost("masters", { action: "update", id: editing.id, ...data });
+      setEditing(null);
+    } else {
+      await adminPost("masters", { action: "add", ...data });
+      setAdding(false);
+    }
+    resetForm(); setSaving(false); load();
+  };
+
+  const toggle = async (id: number) => { await adminPost("masters", { action: "toggle", id }); load(); };
+  const startEdit = (m: any) => {
+    setForm({ name: m.name, spec: m.spec || "", rating: String(m.rating || 5.0), reviews_count: String(m.reviews_count || 0), photo_url: m.photo_url || "", tags: m.tags || "" });
+    setEditing(m); setAdding(false);
+  };
+
+  const FormBlock = () => (
+    <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+      {[
+        { k: "name", l: "Имя мастера", ph: "Имя Фамилия" },
+        { k: "spec", l: "Специализация", ph: "Косметолог-эстетист" },
+        { k: "rating", l: "Рейтинг (1-5)", ph: "5.0" },
+        { k: "reviews_count", l: "Количество отзывов", ph: "0" },
+        { k: "tags", l: "Услуги (через запятую)", ph: "СМАС-лифтинг, РФ-лифтинг" },
+      ].map(f => (
+        <div key={f.k}>
+          <label className="text-xs font-medium block mb-1" style={PS}>{f.l}</label>
+          <input value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
+            placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+        </div>
+      ))}
+      <div>
+        <label className="text-xs font-medium block mb-1" style={PS}>Фото мастера</label>
+        <label className="flex items-center gap-3 cursor-pointer">
+          {form.photo_url && (
+            <img src={form.photo_url} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" alt="preview" onError={e => (e.currentTarget.style.display="none")} />
+          )}
+          <div className="flex-1 py-2.5 px-4 rounded-xl text-sm text-center font-medium"
+            style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px dashed hsl(335 50% 80%)" }}>
+            {form.photo_url ? "Изменить фото" : "📷 Загрузить из телефона"}
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+        </label>
+        {form.photo_url && form.photo_url.startsWith("http") && (
+          <input value={form.photo_url} onChange={e => setForm(p => ({ ...p, photo_url: e.target.value }))}
+            placeholder="или вставь URL" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mt-2" style={inp} />
+        )}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : editing ? "Сохранить" : "Добавить"}
+        </button>
+        <button onClick={() => { resetForm(); setAdding(false); setEditing(null); }}
+          className="px-4 py-3 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-3" style={PS}>Мастера отображаются клиентам на странице и при записи</p>
+      {!adding && !editing && (
+        <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+          + Добавить мастера
+        </button>
+      )}
+      {(adding || editing) && <FormBlock />}
+
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-3">
+        {masters.map(m => (
+          <div key={m.id} className="card-glow rounded-2xl p-4" style={!m.is_active ? { opacity: 0.5 } : {}}>
+            <div className="flex items-center gap-3">
+              {m.photo_url
+                ? <img src={m.photo_url} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={m.name} onError={e => (e.currentTarget.style.display="none")} />
+                : <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0" style={GRAD}>{m.name[0]}</div>
+              }
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm" style={P}>{m.name}</div>
+                <div className="text-xs" style={PS}>{m.spec}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs" style={{ color: "hsl(40 90% 50%)" }}>★ {m.rating}</span>
+                  {m.reviews_count > 0 && <span className="text-xs" style={PS}>{m.reviews_count} отз.</span>}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5 flex-shrink-0">
+                <button onClick={() => startEdit(m)} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>✏️</button>
+                <button onClick={() => toggle(m.id)} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                  {m.is_active ? "Скрыть" : "Показ."}
+                </button>
+              </div>
+            </div>
+            {m.tags && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {m.tags.split(",").map((t: string) => t.trim()).filter(Boolean).map((tag: string) => (
+                  <span key={tag} className="px-2 py-0.5 rounded-full text-xs" style={{ background: "hsl(335 80% 60% / 0.1)", color: "hsl(335 70% 45%)" }}>{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        {!loading && masters.length === 0 && <div className="text-center py-8 text-sm" style={PS}>Мастеров пока нет</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── ПИН-ЭКРАН с отпечатком пальца ──
 function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void; onBack: () => void }) {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState(0);
+  const [fingerprintAttempts, setFingerprintAttempts] = useState(0);
+  const [fingerprintSupported, setFingerprintSupported] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+
+  useEffect(() => {
+    const supported = !!(window.PublicKeyCredential);
+    setFingerprintSupported(supported);
+    if (supported) {
+      tryFingerprint();
+    } else {
+      setShowPin(true);
+    }
+  }, []);
+
+  const tryFingerprint = async () => {
+    try {
+      const challenge = new Uint8Array(32);
+      crypto.getRandomValues(challenge);
+      await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          timeout: 30000,
+          userVerification: "required",
+          rpId: window.location.hostname,
+          allowCredentials: [],
+        } as any,
+      });
+      // Если отпечаток прошёл — авторизуем как сохранённый владелец
+      const savedSession = localStorage.getItem("gp_fingerprint_user");
+      if (savedSession) {
+        onSuccess(JSON.parse(savedSession));
+      } else {
+        setError("Отпечаток принят — введи пин однократно для привязки");
+        setShowPin(true);
+      }
+    } catch {
+      const next = fingerprintAttempts + 1;
+      setFingerprintAttempts(next);
+      if (next >= 5) {
+        setError("Отпечаток не распознан после 5 попыток — введи пин-код");
+        setShowPin(true);
+      } else {
+        setError(`Отпечаток не распознан (${next}/5)`);
+      }
+    }
+  };
 
   const handleDigit = (d: string) => {
     if (pin.length >= 4) return;
@@ -1460,6 +1677,8 @@ function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void;
     try {
       const data = await adminPost("auth", { pin: p });
       if (data.ok) {
+        // Если вошёл пин-кодом — сохраняем для отпечатка
+        localStorage.setItem("gp_fingerprint_user", JSON.stringify(data.staff));
         onSuccess(data.staff);
       } else {
         setAttempts(a => a + 1);
@@ -1478,46 +1697,77 @@ function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-fade-in">
-      <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg mb-6"
-        style={{ background: "rgba(255,255,255,0.95)" }}>
+      <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg mb-6" style={{ background: "rgba(255,255,255,0.95)" }}>
         <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
       </div>
       <h1 className="text-2xl font-oswald font-bold mb-1" style={P}>Панель управления</h1>
-      <p className="text-sm mb-8" style={PS}>Введи пин-код для входа</p>
+      <p className="text-sm mb-6" style={PS}>{showPin ? "Введи пин-код" : "Используй отпечаток пальца"}</p>
 
-      {/* Точки пина */}
-      <div className="flex gap-4 mb-8">
-        {[0,1,2,3].map(i => (
-          <div key={i} className="w-4 h-4 rounded-full border-2 transition-all duration-200"
-            style={pin.length > i
-              ? { background: "hsl(335 80% 58%)", borderColor: "hsl(335 80% 58%)" }
-              : { borderColor: "hsl(335 50% 80%)", background: "transparent" }} />
-        ))}
-      </div>
-
-      {error && (
-        <div className="mb-4 px-4 py-2 rounded-xl text-sm font-medium"
-          style={{ background: "hsl(0 80% 96%)", color: "hsl(0 70% 45%)", border: "1px solid hsl(0 60% 88%)" }}>
-          {error} {attempts >= 3 && "· Подсказка: 2025"}
+      {/* Отпечаток пальца */}
+      {fingerprintSupported && !showPin && (
+        <div className="flex flex-col items-center mb-8">
+          <button onClick={tryFingerprint}
+            className="w-24 h-24 rounded-full flex items-center justify-center shadow-lg mb-4 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+            <Icon name="Fingerprint" size={44} className="text-white" />
+          </button>
+          <p className="text-xs text-center max-w-[200px]" style={PS}>Приложи палец к сканеру</p>
+          {error && (
+            <div className="mt-3 px-4 py-2 rounded-xl text-sm font-medium text-center"
+              style={{ background: "hsl(0 80% 96%)", color: "hsl(0 70% 45%)", border: "1px solid hsl(0 60% 88%)" }}>
+              {error}
+            </div>
+          )}
+          <button onClick={() => { setShowPin(true); setError(""); }} className="mt-4 text-sm underline" style={PS}>
+            Войти по пин-коду
+          </button>
         </div>
       )}
 
-      {/* Цифровая клавиатура */}
-      <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
-        {digits.map((d, i) => (
-          <button key={i}
-            onClick={() => { if (d === "⌫") { setPin(p => p.slice(0,-1)); setError(""); } else if (d) handleDigit(d); }}
-            disabled={loading || !d}
-            className="h-16 rounded-2xl font-oswald font-bold text-2xl transition-all active:scale-95"
-            style={d
-              ? { background: "white", color: "hsl(335 60% 30%)", boxShadow: "0 2px 8px hsl(335 30% 85%)", border: "1px solid hsl(335 30% 92%)" }
-              : { background: "transparent" }}>
-            {d}
-          </button>
-        ))}
-      </div>
+      {/* Пин-код */}
+      {(showPin || !fingerprintSupported) && (
+        <>
+          <div className="flex gap-4 mb-6">
+            {[0,1,2,3].map(i => (
+              <div key={i} className="w-4 h-4 rounded-full border-2 transition-all duration-200"
+                style={pin.length > i
+                  ? { background: "hsl(335 80% 58%)", borderColor: "hsl(335 80% 58%)" }
+                  : { borderColor: "hsl(335 50% 80%)", background: "transparent" }} />
+            ))}
+          </div>
 
-      <button onClick={onBack} className="mt-8 text-sm" style={PS}>← Вернуться на главную</button>
+          {error && (
+            <div className="mb-4 px-4 py-2 rounded-xl text-sm font-medium text-center"
+              style={{ background: "hsl(0 80% 96%)", color: "hsl(0 70% 45%)", border: "1px solid hsl(0 60% 88%)" }}>
+              {error} {attempts >= 3 && "· Подсказка: 2025"}
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+            {digits.map((d, i) => (
+              <button key={i}
+                onClick={() => { if (d === "⌫") { setPin(p => p.slice(0,-1)); setError(""); } else if (d) handleDigit(d); }}
+                disabled={loading || !d}
+                className="h-16 rounded-2xl font-oswald font-bold text-2xl transition-all active:scale-95"
+                style={d
+                  ? { background: "white", color: "hsl(335 60% 30%)", boxShadow: "0 2px 8px hsl(335 30% 85%)", border: "1px solid hsl(335 30% 92%)" }
+                  : { background: "transparent" }}>
+                {d}
+              </button>
+            ))}
+          </div>
+
+          {fingerprintSupported && (
+            <button onClick={() => { setShowPin(false); setError(""); setPin(""); tryFingerprint(); }}
+              className="mt-5 flex items-center gap-2 text-sm font-medium"
+              style={{ color: "hsl(335 70% 50%)" }}>
+              <Icon name="Fingerprint" size={16} /> Попробовать отпечаток
+            </button>
+          )}
+        </>
+      )}
+
+      <button onClick={onBack} className="mt-6 text-sm" style={PS}>← Вернуться на главную</button>
     </div>
   );
 }

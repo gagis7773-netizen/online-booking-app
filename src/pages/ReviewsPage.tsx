@@ -10,7 +10,7 @@ const pinkBorder = "hsl(335 50% 85%)";
 
 const SERVICES = ["Криолиполиз", "СМАС-лифтинг", "Биоревитализация", "РФ-лифтинг", "Увеличение губ", "Уходовые процедуры", "Микронидлинг", "Вакуумный массаж", "Другое"];
 
-export default function ReviewsPage() {
+export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
   const [reviews, setReviews] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -61,7 +61,14 @@ export default function ReviewsPage() {
 
   return (
     <div className="animate-fade-in pb-4">
-      <div className="px-4 pt-12 pb-4">
+      <div className="px-4 pt-12 pb-4 flex items-start gap-3">
+        {onBack && (
+          <button onClick={onBack} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+            style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+            <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+          </button>
+        )}
+        <div className="flex-1">
         <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: textDark }}>Отзывы ⭐</h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
@@ -71,6 +78,7 @@ export default function ReviewsPage() {
           </div>
           <span className="font-bold" style={{ color: textDark }}>{avgRating}</span>
           <span className="text-sm" style={{ color: textMid }}>· {reviews.length} отзывов</span>
+        </div>
         </div>
       </div>
 
