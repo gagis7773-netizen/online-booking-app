@@ -170,8 +170,8 @@ function clearCart() { localStorage.removeItem("gp_cart"); }
 const adminPost = (section: string, extra?: object) =>
   fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
 
-// Сжатие изображения через Canvas перед загрузкой
-async function compressImage(file: File, maxSizePx = 1600, quality = 0.82): Promise<string> {
+// Сжатие изображения через Canvas — уменьшаем до безопасного размера для передачи
+async function compressImage(file: File, maxSizePx = 1200, quality = 0.78): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reject;
@@ -180,6 +180,7 @@ async function compressImage(file: File, maxSizePx = 1600, quality = 0.82): Prom
       img.onerror = reject;
       img.onload = () => {
         let { width, height } = img;
+        // Уменьшаем если больше maxSizePx
         if (width > maxSizePx || height > maxSizePx) {
           if (width > height) { height = Math.round((height / width) * maxSizePx); width = maxSizePx; }
           else { width = Math.round((width / height) * maxSizePx); height = maxSizePx; }
@@ -189,7 +190,19 @@ async function compressImage(file: File, maxSizePx = 1600, quality = 0.82): Prom
         const ctx = canvas.getContext("2d");
         if (!ctx) { resolve(e.target?.result as string); return; }
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        let result = canvas.toDataURL("image/jpeg", quality);
+        // Если всё ещё слишком большой (>3МБ base64) — сжимаем ещё
+        if (result.length > 3_000_000) {
+          result = canvas.toDataURL("image/jpeg", 0.6);
+        }
+        if (result.length > 3_000_000) {
+          // Уменьшаем размер ещё раз
+          const canvas2 = document.createElement("canvas");
+          canvas2.width = Math.round(width * 0.7); canvas2.height = Math.round(height * 0.7);
+          const ctx2 = canvas2.getContext("2d");
+          if (ctx2) { ctx2.drawImage(img, 0, 0, canvas2.width, canvas2.height); result = canvas2.toDataURL("image/jpeg", 0.65); }
+        }
+        resolve(result);
       };
       img.src = e.target?.result as string;
     };
@@ -197,19 +210,37 @@ async function compressImage(file: File, maxSizePx = 1600, quality = 0.82): Prom
   });
 }
 
-// Загрузка фото в S3 из base64
+// Загрузка фото в S3 — с retry при сетевой ошибке
 async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
-  // Сжимаем перед отправкой — уменьшает размер в 5-10 раз
+  // Проверяем размер файла (не более 20МБ)
+  if (file.size > 20 * 1024 * 1024) throw new Error("Файл слишком большой (максимум 20 МБ)");
+
   const base64 = await compressImage(file);
-  const res = await fetch(UPLOAD_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: base64, folder }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.url) return data.url;
-  throw new Error("No URL in response");
+
+  // Retry до 3 раз
+  let lastError: Error = new Error("Unknown");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30 сек таймаут
+      const res = await fetch(UPLOAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, folder }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.url) return data.url;
+      throw new Error("No URL");
+    } catch (err: any) {
+      lastError = err;
+      if (err.name === "AbortError") lastError = new Error("Превышено время ожидания");
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt)); // пауза между попытками
+    }
+  }
+  throw lastError;
 }
 
 // Загрузка видео с телефона в S3
@@ -319,22 +350,37 @@ function PhotoUploadButton({
   uploading: boolean;
   setUploading: (v: boolean) => void;
 }) {
+  const [status, setStatus] = React.useState("");
   return (
-    <label className={"cursor-pointer flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all " + className}
-      style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px dashed hsl(335 50% 80%)" }}>
-      {uploading ? "Загружаем..." : label}
-      <input type="file" accept="image/*" className="hidden" disabled={uploading}
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setUploading(true);
-          try {
-            const url = await uploadPhoto(file, folder);
-            onUploaded(url);
-          } catch { alert("Ошибка загрузки, попробуй ещё раз"); }
-          finally { setUploading(false); e.target.value = ""; }
-        }} />
-    </label>
+    <div className={"flex flex-col gap-1 " + className}>
+      <label className={"cursor-pointer flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all " + (uploading ? "opacity-60 cursor-not-allowed" : "")}
+        style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1.5px dashed hsl(335 50% 80%)" }}>
+        {uploading ? `⏳ ${status || "Сжимаем фото..."}` : label}
+        <input type="file" accept="image/*" className="hidden" disabled={uploading}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            setStatus("Сжимаем фото...");
+            try {
+              setStatus("Отправляем...");
+              const url = await uploadPhoto(file, folder);
+              setStatus("");
+              onUploaded(url);
+            } catch (err: any) {
+              setStatus("");
+              const msg = err?.message || "Неизвестная ошибка";
+              alert(`Не удалось загрузить фото.\n${msg}\n\nПопробуй выбрать фото меньшего размера.`);
+            }
+            finally { setUploading(false); e.target.value = ""; }
+          }} />
+      </label>
+      {uploading && (
+        <div className="text-[11px] text-center" style={{ color: "hsl(335 40% 60%)" }}>
+          {status} Это может занять 10–20 секунд...
+        </div>
+      )}
+    </div>
   );
 }
 

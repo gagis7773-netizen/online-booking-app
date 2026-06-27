@@ -22,7 +22,11 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
-    body = json.loads(event.get("body") or "{}")
+    raw_body = event.get("body") or "{}"
+    # Если тело пришло в base64 (платформа может кодировать большие тела)
+    if event.get("isBase64Encoded"):
+        raw_body = base64.b64decode(raw_body).decode("utf-8")
+    body = json.loads(raw_body)
     image_data = body.get("image")  # base64 строка
     folder = body.get("folder", "uploads")  # gallery / pricelist / documents / avatars
 
