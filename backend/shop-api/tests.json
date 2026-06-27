@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Список категорий",
+      "method": "POST",
+      "path": "/",
+      "body": { "section": "categories", "active_only": true },
+      "expectedStatus": 200,
+      "expectedBody": { "categories": [] },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

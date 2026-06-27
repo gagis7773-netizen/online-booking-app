@@ -120,6 +120,21 @@ const SEND_BOOKING_URL = "https://functions.poehali.dev/33731d63-c7a5-4a89-b075-
 const UPLOAD_URL = "https://functions.poehali.dev/ccf6566c-3696-4ba5-af83-98e41caa2162";
 const YANDEX_REVIEWS_URL = "https://functions.poehali.dev/4ef8938c-3c1a-44c7-82d4-d62e6f0546fa";
 
+// Корзина магазина (localStorage)
+function getCart(): any[] { try { return JSON.parse(localStorage.getItem("gp_cart") || "[]"); } catch { return []; } }
+function saveCart(c: any[]) { localStorage.setItem("gp_cart", JSON.stringify(c)); }
+function addToCart(product: any) {
+  const cart = getCart();
+  const idx = cart.findIndex((i: any) => i.product_id === product.id);
+  if (idx >= 0) cart[idx].quantity = (cart[idx].quantity || 1) + 1;
+  else cart.push({ product_id: product.id, name: product.name, price: Number(product.price), quantity: 1, photo_url: product.photo_url });
+  saveCart(cart);
+}
+function removeFromCart(productId: number) {
+  saveCart(getCart().filter((i: any) => i.product_id !== productId));
+}
+function clearCart() { localStorage.removeItem("gp_cart"); }
+
 const adminPost = (section: string, extra?: object) =>
   fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
 
@@ -143,6 +158,54 @@ async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// Загрузка видео с телефона в S3
+async function uploadVideo(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target?.result as string;
+      try {
+        const res = await fetch(UPLOAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64, folder: "videos" }),
+        });
+        const data = await res.json();
+        if (data.url) resolve(data.url);
+        else reject(new Error("No URL"));
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function VideoUploadButton({ onUploaded }: { onUploaded: (url: string) => void }) {
+  const [upl, setUpl] = React.useState(false);
+  const [progress, setProgress] = React.useState("");
+  return (
+    <label className="cursor-pointer flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-medium w-full"
+      style={{ background: "hsl(270 50% 96%)", color: "hsl(270 60% 45%)", border: "1.5px dashed hsl(270 50% 78%)" }}>
+      {upl ? `⏳ ${progress || "Загружаем видео..."}` : "🎬 Выбрать видео с телефона"}
+      <input type="file" accept="video/*" className="hidden" disabled={upl}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          if (file.size > 100 * 1024 * 1024) { alert("Видео слишком большое (максимум 100 МБ)"); return; }
+          setUpl(true);
+          setProgress("Читаем файл...");
+          try {
+            setProgress("Загружаем...");
+            const url = await uploadVideo(file);
+            onUploaded(url);
+            setProgress("");
+          } catch { alert("Ошибка загрузки видео, попробуй ещё раз"); }
+          finally { setUpl(false); e.target.value = ""; }
+        }} />
+    </label>
+  );
 }
 
 // Минималистичная кнопка загрузки фото для разделов (без useState)
@@ -223,7 +286,7 @@ function PhotoUploadButton({
   );
 }
 
-type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery" | "documents";
+type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery" | "documents" | "shop";
 
 const services = [
   { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
@@ -314,9 +377,16 @@ export default function Index() {
     const isNew = !loadClient();
     saveClient(c);
     setClient(c);
-    // Нежный звук приветствия при входе
+    // Нежный звук приветствия при входе (учитываем выбранный пресет)
     if (isClientSoundEnabled()) {
-      setTimeout(() => playWelcomeSound(0.35), 200);
+      const ss = getSoundSettings();
+      const wp = ss.welcome_preset || "welcome_default";
+      const vol = ss.volume ?? 0.35;
+      setTimeout(() => {
+        if (wp === "welcome_chime") playNotificationSound("chime", vol);
+        else if (wp === "welcome_soft") playNotificationSound("soft", vol);
+        else if (wp !== "welcome_none") playWelcomeSound(vol);
+      }, 200);
     }
     if (isNew) {
       adminPost("notify_owner", {
@@ -426,6 +496,7 @@ export default function Index() {
         {page === "documents" && <ClientDocumentsPage setPage={navigateTo} onBack={() => navigateBack("home")} />}
         {page === "chat" && <ChatPage onBack={() => navigateBack("home")} />}
         {page === "admin" && <AdminPage onBack={() => navigateBack("home")} />}
+        {page === "shop" && <ShopPage client={client} onBack={() => navigateBack("home")} />}
       </div>
 
       <BottomNav page={page} setPage={navigateTo} />
@@ -555,47 +626,6 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         </button>
       </div>
 
-      {/* Видео (показывается если включено в настройках) */}
-      {siteSettings.video_show === "true" && siteSettings.video_url && (
-        <div className="px-4 mb-5">
-          {siteSettings.video_title && (
-            <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>
-              {siteSettings.video_title}
-            </h2>
-          )}
-          <div className="rounded-3xl overflow-hidden shadow-xl"
-            style={{ height: Number(siteSettings.video_height || 240) }}>
-            {siteSettings.video_url.includes("youtube.com") || siteSettings.video_url.includes("youtu.be") ? (
-              /* YouTube embed */
-              <iframe
-                src={siteSettings.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{ border: "none" }}
-              />
-            ) : siteSettings.video_url.includes("vk.com") ? (
-              /* VK embed */
-              <iframe
-                src={siteSettings.video_url}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; fullscreen"
-                style={{ border: "none" }}
-              />
-            ) : (
-              /* Прямой mp4/видеофайл */
-              <video
-                src={siteSettings.video_url}
-                controls
-                playsInline
-                className="w-full h-full object-cover"
-                style={{ background: "#000" }}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Разделы */}
       <div className="px-4 mb-5">
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
@@ -636,6 +666,31 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
           })}
         </div>
       </div>
+
+      {/* Видео — под разделами */}
+      {siteSettings.video_show === "true" && siteSettings.video_url && (
+        <div className="px-4 mb-5">
+          {siteSettings.video_title && (
+            <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>
+              {siteSettings.video_title}
+            </h2>
+          )}
+          <div className="rounded-3xl overflow-hidden shadow-xl"
+            style={{ height: Number(siteSettings.video_height || 240) }}>
+            {siteSettings.video_url.includes("youtube.com") || siteSettings.video_url.includes("youtu.be") ? (
+              <iframe src={siteSettings.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen style={{ border: "none" }} />
+            ) : siteSettings.video_url.includes("vk.com") ? (
+              <iframe src={siteSettings.video_url} className="w-full h-full"
+                allow="autoplay; encrypted-media; fullscreen" style={{ border: "none" }} />
+            ) : (
+              <video src={siteSettings.video_url} controls playsInline
+                className="w-full h-full object-cover" style={{ background: "#000" }} />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ВКонтакте — только QR без синей кнопки */}
       <div className="px-4 mb-5">
@@ -1601,7 +1656,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents" | "templates" | "site_settings";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents" | "templates" | "site_settings" | "shop_admin";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1638,6 +1693,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "expenses", icon: "Wallet", label: "Финансы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
+    { id: "shop_admin", icon: "ShoppingBag", label: "Магазин", color: "from-pink-500 to-rose-400", ownerOnly: true },
     { id: "site_settings", icon: "Paintbrush", label: "Оформление", color: "from-fuchsia-500 to-pink-500", ownerOnly: true },
     { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
@@ -1677,12 +1733,22 @@ function AdminPage({ onBack }: { onBack: () => void }) {
             </button>
             <button
               onClick={() => setSection("messages")}
-              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm relative"
+              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm"
               style={{ background: "white", color: "hsl(335 70% 45%)", border: "2px solid hsl(335 70% 78%)", boxShadow: "0 4px 16px hsl(335 50% 85% / 0.5)" }}>
               <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 70% 45%)" }} />
               Сообщения
             </button>
           </div>
+          {/* Заказы магазина */}
+          {isOwner && (
+            <button
+              onClick={() => setSection("shop_admin")}
+              className="w-full py-3 rounded-2xl font-semibold shadow flex items-center justify-center gap-2 text-sm mb-4"
+              style={{ background: "linear-gradient(135deg, hsl(315 70% 65%), hsl(270 60% 62%))", color: "white", boxShadow: "0 3px 12px hsl(315 70% 75% / 0.4)" }}>
+              <Icon name="ShoppingBag" size={17} className="text-white" />
+              Заказы магазина
+            </button>
+          )}
 
           {/* Краткая сводка на главной */}
           {isOwner && stats && (
@@ -1735,6 +1801,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "expenses" && isOwner && <AdminFinanceHub />}
       {section === "gallery" && <AdminGalleryFolders />}
       {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
+      {section === "shop_admin" && isOwner && <AdminShop />}
       {section === "site_settings" && isOwner && <AdminSiteSettings />}
       {section === "documents" && isOwner && <AdminDocuments />}
       {/* Настройки теперь содержат сотрудников */}
@@ -4580,7 +4647,7 @@ function AdminSiteSettings() {
         <div className="flex items-center justify-between">
           <div>
             <div className="font-semibold text-sm" style={P}>Видео на главной 🎬</div>
-            <p className="text-xs mt-0.5" style={PS}>Видео между фото салона и разделами</p>
+            <p className="text-xs mt-0.5" style={PS}>Появляется под блоком Разделы</p>
           </div>
           {/* Переключатель показать/скрыть */}
           <button
@@ -4592,12 +4659,21 @@ function AdminSiteSettings() {
           </button>
         </div>
 
+        {/* Загрузка видео с телефона */}
         <div>
-          <label className="text-xs block mb-1" style={PS}>Ссылка на видео (YouTube, ВКонтакте или mp4)</label>
+          <label className="text-xs block mb-2" style={PS}>Загрузить видео с телефона (mp4)</label>
+          <VideoUploadButton onUploaded={url => { set("video_url", url); set("video_show", "true"); }} />
+          {settings.video_url && settings.video_url.startsWith("https://cdn.poehali.dev") && (
+            <p className="text-[10px] mt-1 text-green-600">✅ Видео загружено с телефона</p>
+          )}
+        </div>
+
+        <div>
+          <label className="text-xs block mb-1" style={PS}>Или вставь ссылку (YouTube / ВКонтакте / mp4)</label>
           <input value={settings.video_url || ""} onChange={e => set("video_url", e.target.value)}
-            placeholder="https://youtube.com/watch?v=... или ссылка на mp4"
+            placeholder="https://youtube.com/watch?v=..."
             className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={inp} />
-          <p className="text-[10px] mt-1" style={PS}>YouTube: вставь обычную ссылку. ВКонтакте: Поделиться → Скопировать код → вставь ссылку из src=""</p>
+          <p className="text-[10px] mt-1" style={PS}>YouTube: обычная ссылка. ВКонтакте: ссылка на видео из браузера</p>
         </div>
 
         <div>
@@ -4989,9 +5065,47 @@ function AdminSettings() {
           className="w-full accent-pink-500" />
       </div>
 
-      {/* Выбор мелодии */}
+      {/* Мелодия приветствия (при входе клиента) */}
       <div className="card-glow rounded-2xl p-4 mb-4">
-        <div className="font-semibold text-sm mb-3" style={P}>Мелодия сигнала</div>
+        <div className="font-semibold text-sm mb-1" style={P}>Мелодия приветствия 🌸</div>
+        <p className="text-xs mb-3" style={PS}>Играет когда клиент открывает приложение</p>
+        <div className="space-y-2 mb-3">
+          {[
+            { key: "welcome_default", label: "Нежная пентатоника (по умолчанию) ✨" },
+            { key: "welcome_chime", label: "Хрустальный перезвон 🔮" },
+            { key: "welcome_soft", label: "Мягкие ноты 🌙" },
+            { key: "welcome_none", label: "Без мелодии 🔇" },
+          ].map(opt => (
+            <button key={opt.key}
+              onClick={() => {
+                updateSound("welcome_preset", opt.key);
+                if (opt.key === "welcome_chime") playNotificationSound("chime", soundSettings.volume ?? 0.35);
+                else if (opt.key === "welcome_soft") playNotificationSound("soft", soundSettings.volume ?? 0.35);
+                else if (opt.key !== "welcome_none") playWelcomeSound(soundSettings.volume ?? 0.35);
+              }}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all"
+              style={(soundSettings.welcome_preset || "welcome_default") === opt.key
+                ? { ...GRAD, color: "white" }
+                : { background: "hsl(335 20% 95%)", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 30% 88%)" }}>
+              <span className="text-sm font-medium">{opt.label}</span>
+              {opt.key !== "welcome_none" && <Icon name="Play" size={14} />}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => {
+          const p = soundSettings.welcome_preset || "welcome_default";
+          if (p === "welcome_chime") playNotificationSound("chime", soundSettings.volume ?? 0.35);
+          else if (p === "welcome_soft") playNotificationSound("soft", soundSettings.volume ?? 0.35);
+          else if (p !== "welcome_none") playWelcomeSound(soundSettings.volume ?? 0.35);
+        }} className="w-full py-2.5 rounded-xl text-sm font-medium"
+          style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+          🌸 Прослушать мелодию входа
+        </button>
+      </div>
+
+      {/* Выбор мелодии уведомления */}
+      <div className="card-glow rounded-2xl p-4 mb-4">
+        <div className="font-semibold text-sm mb-3" style={P}>Мелодия уведомлений (новые SMS)</div>
         <div className="space-y-2">
           {Object.entries(SOUND_PRESETS).map(([key, preset]) => (
             <button key={key}
@@ -5012,7 +5126,7 @@ function AdminSettings() {
         onClick={() => playNotificationSound(soundSettings.preset || "bell", soundSettings.volume ?? 0.5)}
         className="w-full py-3 rounded-2xl font-semibold text-white"
         style={GRAD}>
-        🔔 Проверить звук
+        🔔 Проверить звук уведомления
       </button>
     </div>
   );
@@ -5086,14 +5200,602 @@ function AdminSettings() {
   );
 }
 
+// ─── МАГАЗИН ─────────────────────────────────────────────────────────────────
+
+function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
+  const [view, setView] = React.useState<"catalog" | "cart" | "checkout" | "done">("catalog");
+  const [categories, setCategories] = React.useState<any[]>([]);
+  const [products, setProducts] = React.useState<any[]>([]);
+  const [activeCat, setActiveCat] = React.useState<number | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [cart, setCart] = React.useState<any[]>(getCart());
+  const [selectedProduct, setSelectedProduct] = React.useState<any | null>(null);
+  // Форма оформления
+  const [deliveryType, setDeliveryType] = React.useState<"sdek" | "ozon" | "post">("sdek");
+  const [address, setAddress] = React.useState("");
+  const [pickupPoint, setPickupPoint] = React.useState("");
+  const [comment, setComment] = React.useState("");
+  const [placing, setPlacing] = React.useState(false);
+  const [orderId, setOrderId] = React.useState<number | null>(null);
+
+  const P2 = { color: "hsl(335 50% 28%)" };
+  const PS2 = { color: "hsl(335 30% 58%)" };
+  const GRAD2 = { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" };
+
+  React.useEffect(() => {
+    adminPost("shop_categories", { active_only: true }).then(d => {
+      setCategories(d.categories || []);
+      if (d.categories?.length > 0) setActiveCat(d.categories[0].id);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (activeCat === null) return;
+    setLoading(true);
+    adminPost("shop_products", { category_id: activeCat, active_only: true }).then(d => {
+      setProducts(d.products || []);
+      setLoading(false);
+    });
+  }, [activeCat]);
+
+  const refreshCart = () => { const c = getCart(); setCart([...c]); };
+
+  const cartTotal = cart.reduce((s, i) => s + i.price * (i.quantity || 1), 0);
+  const cartCount = cart.reduce((s, i) => s + (i.quantity || 1), 0);
+
+  const placeOrder = async () => {
+    if (!address.trim() && !pickupPoint.trim()) { alert("Укажи адрес или пункт выдачи"); return; }
+    setPlacing(true);
+    const res = await adminPost("shop_orders", {
+      action: "create",
+      client_id: client?.id || null,
+      client_name: client?.name || "Гость",
+      client_phone: client?.phone || "",
+      delivery_type: deliveryType,
+      delivery_address: address,
+      pickup_point: pickupPoint,
+      comment,
+      items: cart,
+    });
+    if (res.ok) {
+      setOrderId(res.order_id);
+      clearCart(); refreshCart();
+      setView("done");
+    }
+    setPlacing(false);
+  };
+
+  const DELIVERY_OPTS = [
+    { id: "sdek", label: "СДЭК", icon: "📦" },
+    { id: "ozon", label: "Пункт Ozon", icon: "🟠" },
+    { id: "post", label: "Почта России", icon: "✉️" },
+  ] as const;
+
+  if (view === "done") return (
+    <div className="animate-fade-in min-h-screen flex flex-col items-center justify-center px-8 text-center">
+      <div className="text-6xl mb-5">🎉</div>
+      <h2 className="text-2xl font-oswald font-bold mb-3" style={P2}>Заказ оформлен!</h2>
+      <p className="text-sm mb-2" style={PS2}>Номер заказа: <strong>#{orderId}</strong></p>
+      <p className="text-sm mb-8" style={PS2}>Мы свяжемся с вами для подтверждения. Проверь SMS на телефоне.</p>
+      <button onClick={() => { setView("catalog"); }} className="w-full py-4 rounded-2xl font-bold text-white" style={GRAD2}>
+        Продолжить покупки
+      </button>
+      <button onClick={onBack} className="w-full py-3 rounded-2xl font-medium mt-3" style={{ background: "hsl(335 20% 94%)", color: "hsl(335 50% 50%)" }}>
+        На главную
+      </button>
+    </div>
+  );
+
+  if (view === "checkout") return (
+    <div className="animate-fade-in pb-6">
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3">
+        <button onClick={() => setView("cart")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+        </button>
+        <h1 className="text-2xl font-oswald font-bold" style={P2}>Оформление заказа</h1>
+      </div>
+      <div className="px-4 space-y-4">
+        {/* Тип доставки */}
+        <div className="card-glow rounded-2xl p-4">
+          <div className="font-semibold text-sm mb-3" style={P2}>Способ получения</div>
+          <div className="space-y-2">
+            {DELIVERY_OPTS.map(opt => (
+              <button key={opt.id} onClick={() => setDeliveryType(opt.id)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+                style={deliveryType === opt.id ? { ...GRAD2, color: "white" } : { background: "hsl(335 20% 96%)", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 30% 88%)" }}>
+                <span className="text-xl">{opt.icon}</span>
+                <span className="font-semibold text-sm">{opt.label}</span>
+                {deliveryType === opt.id && <Icon name="Check" size={16} className="ml-auto text-white" />}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Пункт выдачи */}
+        <div className="card-glow rounded-2xl p-4 space-y-3">
+          <div className="font-semibold text-sm" style={P2}>Ближайший пункт выдачи</div>
+          <input value={pickupPoint} onChange={e => setPickupPoint(e.target.value)}
+            placeholder={`Адрес пункта ${DELIVERY_OPTS.find(o => o.id === deliveryType)?.label || ""}...`}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 28%)" }} />
+          <div className="font-semibold text-sm" style={P2}>Или укажи свой адрес</div>
+          <input value={address} onChange={e => setAddress(e.target.value)}
+            placeholder="Город, улица, дом, квартира"
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 28%)" }} />
+        </div>
+        {/* Комментарий */}
+        <div className="card-glow rounded-2xl p-4">
+          <div className="font-semibold text-sm mb-2" style={P2}>Комментарий к заказу</div>
+          <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
+            placeholder="Необязательно..."
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
+            style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 28%)" }} />
+        </div>
+        {/* Итого */}
+        <div className="card-glow rounded-2xl p-4 flex justify-between items-center">
+          <span className="font-semibold text-sm" style={P2}>Итого к оплате</span>
+          <span className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>
+            {cartTotal.toLocaleString()} ₽
+          </span>
+        </div>
+        <button onClick={placeOrder} disabled={placing}
+          className="w-full py-4 rounded-2xl font-bold text-white shadow-lg text-base" style={GRAD2}>
+          {placing ? "Оформляем..." : "✅ Подтвердить заказ"}
+        </button>
+      </div>
+    </div>
+  );
+
+  if (view === "cart") return (
+    <div className="animate-fade-in pb-6">
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3">
+        <button onClick={() => setView("catalog")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+        </button>
+        <h1 className="text-2xl font-oswald font-bold" style={P2}>Корзина 🛒</h1>
+      </div>
+      {cart.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-5xl mb-4">🛍</div>
+          <p className="text-sm" style={PS2}>Корзина пуста</p>
+          <button onClick={() => setView("catalog")} className="mt-4 px-6 py-3 rounded-2xl font-semibold text-white" style={GRAD2}>
+            В каталог
+          </button>
+        </div>
+      ) : (
+        <div className="px-4 space-y-3">
+          {cart.map(item => (
+            <div key={item.product_id} className="card-glow rounded-2xl p-4 flex items-center gap-3">
+              {item.photo_url && <img src={item.photo_url} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" alt={item.name} />}
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm truncate" style={P2}>{item.name}</div>
+                <div className="text-sm font-bold mt-0.5" style={{ color: "hsl(335 80% 55%)" }}>{item.price.toLocaleString()} ₽</div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button onClick={() => {
+                  const c = getCart(); const idx = c.findIndex((i: any) => i.product_id === item.product_id);
+                  if (c[idx].quantity > 1) c[idx].quantity--; else c.splice(idx, 1);
+                  saveCart(c); refreshCart();
+                }} className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-lg"
+                  style={{ background: "hsl(335 20% 93%)", color: "hsl(335 50% 50%)" }}>−</button>
+                <span className="w-5 text-center text-sm font-bold" style={P2}>{item.quantity}</span>
+                <button onClick={() => { addToCart({ id: item.product_id, ...item }); refreshCart(); }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-lg" style={GRAD2}>+</button>
+              </div>
+              <button onClick={() => { removeFromCart(item.product_id); refreshCart(); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>
+                <Icon name="X" size={14} />
+              </button>
+            </div>
+          ))}
+          <div className="card-glow rounded-2xl p-4 flex justify-between items-center">
+            <span style={PS2}>{cartCount} товар(а)</span>
+            <span className="font-oswald font-bold text-lg" style={{ color: "hsl(335 80% 55%)" }}>{cartTotal.toLocaleString()} ₽</span>
+          </div>
+          <button onClick={() => setView("checkout")} className="w-full py-4 rounded-2xl font-bold text-white text-base shadow-lg" style={GRAD2}>
+            Оформить заказ →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── КАТАЛОГ ──
+  return (
+    <div className="animate-fade-in pb-6">
+      {/* Шапка */}
+      <div className="px-4 pt-12 pb-3 flex items-center gap-3">
+        <button onClick={onBack} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+        </button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-oswald font-bold" style={P2}>Магазин 🛍</h1>
+          <p className="text-xs" style={PS2}>Косметика, аромат и уход</p>
+        </div>
+        <button onClick={() => setView("cart")} className="relative w-10 h-10 rounded-full flex items-center justify-center"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ShoppingCart" size={18} style={{ color: "hsl(335 60% 40%)" }} />
+          {cartCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
+              style={{ background: "hsl(335 80% 55%)" }}>{cartCount}</span>
+          )}
+        </button>
+      </div>
+
+      {/* Категории */}
+      {categories.length > 0 && (
+        <div className="flex gap-2 px-4 mb-4 overflow-x-auto scrollbar-hide pb-1">
+          {categories.map(cat => (
+            <button key={cat.id} onClick={() => setActiveCat(cat.id)}
+              className="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-semibold transition-all"
+              style={activeCat === cat.id ? { ...GRAD2, color: "white" } : { background: "white", color: "hsl(335 50% 50%)", border: "1px solid hsl(335 50% 85%)" }}>
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Товары */}
+      {loading && <div className="text-center py-12"><div className="text-3xl animate-float">🌸</div></div>}
+      {!loading && products.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-4xl mb-3">📦</div>
+          <p className="text-sm" style={PS2}>Товары в этой категории скоро появятся</p>
+        </div>
+      )}
+      <div className="px-4 grid grid-cols-2 gap-3">
+        {products.map(prod => (
+          <button key={prod.id} onClick={() => setSelectedProduct(prod)}
+            className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
+            {prod.photo_url
+              ? <img src={prod.photo_url} className="w-full h-36 object-cover" alt={prod.name} />
+              : <div className="w-full h-36 flex items-center justify-center text-3xl" style={{ background: "hsl(335 80% 96%)" }}>🛍</div>
+            }
+            <div className="p-3">
+              <div className="font-semibold text-xs leading-tight mb-1 line-clamp-2" style={P2}>{prod.name}</div>
+              <div className="flex items-center justify-between">
+                <span className="font-oswald font-bold text-sm" style={{ color: "hsl(335 80% 55%)" }}>
+                  {Number(prod.price).toLocaleString()} ₽
+                </span>
+                <button onClick={e => { e.stopPropagation(); addToCart(prod); refreshCart(); }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-lg font-bold" style={GRAD2}>+</button>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Карточка товара (модалка) */}
+      {selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setSelectedProduct(null)}>
+          <div className="w-full max-w-lg rounded-t-3xl overflow-hidden" style={{ background: "white" }}
+            onClick={e => e.stopPropagation()}>
+            {selectedProduct.photo_url && (
+              <img src={selectedProduct.photo_url} className="w-full h-56 object-cover" alt={selectedProduct.name} />
+            )}
+            <div className="p-5">
+              <div className="flex items-start justify-between mb-2">
+                <h3 className="font-oswald font-bold text-xl" style={P2}>{selectedProduct.name}</h3>
+                <button onClick={() => setSelectedProduct(null)} className="text-gray-400 text-xl ml-2">✕</button>
+              </div>
+              {selectedProduct.description && (
+                <p className="text-sm mb-4 leading-relaxed" style={PS2}>{selectedProduct.description}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="font-oswald font-bold text-2xl" style={{ color: "hsl(335 80% 55%)" }}>
+                  {Number(selectedProduct.price).toLocaleString()} ₽
+                </span>
+                <button onClick={() => { addToCart(selectedProduct); refreshCart(); setSelectedProduct(null); setView("cart"); }}
+                  className="px-6 py-3 rounded-2xl font-bold text-white" style={GRAD2}>
+                  В корзину 🛒
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── АДМИН: Магазин (товары + категории + заказы) ──
+function AdminShop() {
+  const [tab, setTab] = React.useState<"products" | "categories" | "orders">("products");
+  return (
+    <div>
+      <div className="px-4 mb-4">
+        <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+          {([
+            { id: "products", label: "Товары" },
+            { id: "categories", label: "Категории" },
+            { id: "orders", label: "Заказы" },
+          ] as const).map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="py-2.5 text-xs font-semibold transition-all"
+              style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === "products" && <AdminShopProducts />}
+      {tab === "categories" && <AdminShopCategories />}
+      {tab === "orders" && <AdminShopOrders />}
+    </div>
+  );
+}
+
+function AdminShopCategories() {
+  const [cats, setCats] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [adding, setAdding] = React.useState(false);
+  const [form, setForm] = React.useState({ name: "", description: "" });
+  const [saving, setSaving] = React.useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const load = () => adminPost("shop_categories").then(d => { setCats(d.categories || []); setLoading(false); });
+  React.useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.name) return;
+    setSaving(true);
+    await adminPost("shop_categories", { action: "add", ...form });
+    setForm({ name: "", description: "" }); setAdding(false); setSaving(false); load();
+  };
+
+  const del = async (id: number) => { await adminPost("shop_categories", { action: "delete", id }); load(); };
+
+  return (
+    <div className="px-4 pb-6">
+      {!adding && (
+        <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+          + Добавить категорию
+        </button>
+      )}
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Название</label>
+            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} autoComplete="off"
+              placeholder="Косметика" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Описание (необязательно)</label>
+            <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} autoComplete="off"
+              placeholder="Уходовая косметика" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              {saving ? "..." : "Добавить"}
+            </button>
+            <button onClick={() => setAdding(false)} className="px-4 py-3 rounded-xl text-sm"
+              style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>Отмена</button>
+          </div>
+        </div>
+      )}
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-2">
+        {cats.map(cat => (
+          <div key={cat.id} className="card-glow rounded-2xl p-4 flex items-center gap-3">
+            <div className="flex-1">
+              <div className="font-semibold text-sm" style={P}>{cat.name}</div>
+              {cat.description && <div className="text-xs" style={PS}>{cat.description}</div>}
+            </div>
+            <button onClick={() => del(cat.id)} className="px-2.5 py-1 rounded-lg text-xs"
+              style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>Удалить</button>
+          </div>
+        ))}
+        {!loading && cats.length === 0 && <div className="text-center py-8 text-sm" style={PS}>Категорий нет</div>}
+      </div>
+    </div>
+  );
+}
+
+function AdminShopProducts() {
+  const [cats, setCats] = React.useState<any[]>([]);
+  const [products, setProducts] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [adding, setAdding] = React.useState(false);
+  const [editing, setEditing] = React.useState<any | null>(null);
+  const [form, setForm] = React.useState({ category_id: "", name: "", description: "", price: "", stock: "", photo_url: "" });
+  const [saving, setSaving] = React.useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const loadAll = () => {
+    adminPost("shop_categories", { active_only: true }).then(d => setCats(d.categories || []));
+    adminPost("shop_products").then(d => { setProducts(d.products || []); setLoading(false); });
+  };
+  React.useEffect(() => { loadAll(); }, []);
+
+  const resetForm = () => setForm({ category_id: "", name: "", description: "", price: "", stock: "", photo_url: "" });
+
+  const save = async () => {
+    if (!form.name || !form.category_id) return;
+    setSaving(true);
+    if (editing) {
+      await adminPost("shop_products", { action: "update", id: editing.id, ...form, price: parseFloat(form.price) || 0, stock: parseInt(form.stock) || 0 });
+      setEditing(null);
+    } else {
+      await adminPost("shop_products", { action: "add", ...form, price: parseFloat(form.price) || 0, stock: parseInt(form.stock) || 0 });
+      setAdding(false);
+    }
+    resetForm(); setSaving(false); loadAll();
+  };
+
+  const startEdit = (p: any) => {
+    setForm({ category_id: String(p.category_id || ""), name: p.name, description: p.description || "", price: String(p.price || ""), stock: String(p.stock || ""), photo_url: p.photo_url || "" });
+    setEditing(p); setAdding(false);
+  };
+
+  const toggle = async (id: number) => { await adminPost("shop_products", { action: "toggle", id }); loadAll(); };
+  const del = async (id: number) => { await adminPost("shop_products", { action: "delete", id }); loadAll(); };
+
+  const grouped: Record<string, any[]> = {};
+  products.forEach(p => { const k = p.category_name || "Без категории"; if (!grouped[k]) grouped[k] = []; grouped[k].push(p); });
+
+  return (
+    <div className="px-4 pb-6">
+      {!adding && !editing && (
+        <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+          + Добавить товар
+        </button>
+      )}
+      {(adding || editing) && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Категория</label>
+            <select value={form.category_id} onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp}>
+              <option value="">Выбрать...</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          {[{ k: "name", l: "Название товара", ph: "Крем для лица" },
+            { k: "description", l: "Описание", ph: "Подробное описание..." },
+            { k: "price", l: "Цена, ₽", ph: "1500" },
+            { k: "stock", l: "Количество на складе", ph: "10" },
+          ].map(f => (
+            <div key={f.k}>
+              <label className="text-xs block mb-1" style={PS}>{f.l}</label>
+              <input value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
+                placeholder={f.ph} autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+            </div>
+          ))}
+          <div>
+            <label className="text-xs block mb-2" style={PS}>Фото товара</label>
+            <PhotoUploadButton folder="shop" label="📷 Загрузить фото" uploading={uploadingPhoto}
+              setUploading={setUploadingPhoto} onUploaded={url => setForm(p => ({ ...p, photo_url: url }))} className="w-full mb-2" />
+            {form.photo_url && <img src={form.photo_url} className="w-full h-32 object-cover rounded-xl" alt="preview" />}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving || uploadingPhoto} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              {saving ? "Сохраняем..." : editing ? "Обновить" : "Добавить"}
+            </button>
+            <button onClick={() => { resetForm(); setAdding(false); setEditing(null); }} className="px-4 py-3 rounded-xl text-sm"
+              style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>Отмена</button>
+          </div>
+        </div>
+      )}
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      {Object.entries(grouped).map(([cat, items]) => (
+        <div key={cat} className="mb-4">
+          <div className="px-3 py-1.5 rounded-xl mb-2 text-xs font-bold" style={{ ...GRAD, color: "white" }}>{cat}</div>
+          <div className="space-y-2">
+            {items.map(prod => (
+              <div key={prod.id} className="card-glow rounded-2xl p-3 flex items-start gap-3" style={!prod.is_active ? { opacity: 0.5 } : {}}>
+                {prod.photo_url && <img src={prod.photo_url} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={prod.name} />}
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={P}>{prod.name}</div>
+                  <div className="text-xs font-bold" style={{ color: "hsl(335 80% 55%)" }}>{Number(prod.price).toLocaleString()} ₽</div>
+                  {prod.description && <div className="text-xs truncate mt-0.5" style={PS}>{prod.description}</div>}
+                </div>
+                <div className="flex flex-col gap-1 flex-shrink-0">
+                  <button onClick={() => startEdit(prod)} className="px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>✏️</button>
+                  <button onClick={() => toggle(prod.id)} className="px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                    {prod.is_active ? "Скрыть" : "Показать"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {!loading && products.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Товаров нет — добавьте первый!</div>}
+    </div>
+  );
+}
+
+function AdminShopOrders() {
+  const [orders, setOrders] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [filter, setFilter] = React.useState("");
+  const [expanded, setExpanded] = React.useState<number | null>(null);
+
+  const load = () => adminPost("shop_orders", filter ? { status: filter } : {}).then(d => { setOrders(d.orders || []); setLoading(false); });
+  React.useEffect(() => { load(); }, [filter]);
+
+  const STATUS_LABELS: Record<string, string> = { new: "🆕 Новый", confirmed: "✅ Подтверждён", shipped: "🚚 Отправлен", done: "✔ Выдан", cancelled: "❌ Отменён" };
+  const STATUS_COLORS: Record<string, string> = { new: "hsl(200 80% 50%)", confirmed: "hsl(142 60% 40%)", shipped: "hsl(30 80% 50%)", done: "hsl(142 60% 35%)", cancelled: "hsl(0 60% 50%)" };
+
+  const updateStatus = async (id: number, status: string) => {
+    await adminPost("shop_orders", { action: "update_status", id, status });
+    load();
+  };
+
+  return (
+    <div className="px-4 pb-6">
+      {/* Фильтр */}
+      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide pb-1">
+        {[{ v: "", l: "Все" }, { v: "new", l: "Новые" }, { v: "confirmed", l: "Подтвержд." }, { v: "shipped", l: "В пути" }, { v: "done", l: "Выданы" }].map(f => (
+          <button key={f.v} onClick={() => setFilter(f.v)}
+            className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold"
+            style={filter === f.v ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+            {f.l}
+          </button>
+        ))}
+      </div>
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-3">
+        {orders.map(o => (
+          <div key={o.id} className="card-glow rounded-2xl overflow-hidden">
+            <button className="w-full p-4 text-left" onClick={() => setExpanded(expanded === o.id ? null : o.id)}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="font-semibold text-sm" style={P}>Заказ #{o.id}</div>
+                  <div className="text-xs mt-0.5" style={PS}>{o.client_name} · {o.client_phone}</div>
+                  <div className="text-xs mt-0.5" style={PS}>{o.delivery_type?.toUpperCase()}: {o.pickup_point || o.delivery_address}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-oswald font-bold text-sm" style={{ color: "hsl(335 80% 55%)" }}>{Number(o.total_amount).toLocaleString()} ₽</div>
+                  <div className="text-xs font-medium mt-0.5" style={{ color: STATUS_COLORS[o.status] || "gray" }}>{STATUS_LABELS[o.status] || o.status}</div>
+                </div>
+              </div>
+            </button>
+            {expanded === o.id && (
+              <div className="px-4 pb-4 border-t" style={{ borderColor: "hsl(335 40% 90%)" }}>
+                <div className="mt-3 space-y-1.5 mb-3">
+                  {(o.items || []).map((it: any) => (
+                    <div key={it.id} className="flex justify-between text-xs" style={PS}>
+                      <span>{it.product_name} × {it.quantity}</span>
+                      <span className="font-semibold">{(it.price * it.quantity).toLocaleString()} ₽</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs mb-3" style={PS}>{new Date(o.created_at).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(STATUS_LABELS).map(([st, lbl]) => (
+                    <button key={st} onClick={() => updateStatus(o.id, st)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                      style={o.status === st ? { background: STATUS_COLORS[st], color: "white" } : { background: "hsl(335 20% 95%)", color: "hsl(335 40% 55%)" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {!loading && orders.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Заказов пока нет</div>}
+      </div>
+    </div>
+  );
+}
+
 // ─── НИЖНЯЯ НАВИГАЦИЯ ────────────────────────────────────────────────────────
 
 function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
+  const cartCount = getCart().reduce((s: number, i: any) => s + (i.quantity || 1), 0);
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "gallery", icon: "Images", label: "Галерея" },
-    { id: "booking", icon: "CalendarPlus", label: "Записаться" },
-    { id: "reviews", icon: "Star", label: "Отзывы" },
+    { id: "booking", icon: "CalendarPlus", label: "Запись" },
+    { id: "shop", icon: "ShoppingBag", label: "Магазин" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
 
@@ -5103,10 +5805,18 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
         style={{ background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px)", border: "1px solid hsl(335 40% 88%)" }}>
         {items.map((item) => (
           <button key={item.id} onClick={() => setPage(item.id)}
-            className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-2xl transition-all flex-1"
+            className="flex flex-col items-center gap-0.5 px-1 py-1 rounded-2xl transition-all flex-1 relative"
             style={page === item.id ? { background: "hsl(335 80% 60% / 0.12)" } : {}}>
-            <Icon name={item.icon as any} size={18}
-              style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }} />
+            <div className="relative">
+              <Icon name={item.icon as any} size={18}
+                style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }} />
+              {item.id === "shop" && cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
+                  style={{ background: "hsl(335 80% 55%)" }}>
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              )}
+            </div>
             <span className="text-[10px] font-medium whitespace-nowrap"
               style={{ color: page === item.id ? "hsl(335 80% 55%)" : "hsl(335 20% 65%)" }}>
               {item.label}

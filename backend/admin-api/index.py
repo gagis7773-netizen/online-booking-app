@@ -570,5 +570,90 @@ def handler(event: dict, context) -> dict:
             conn.commit()
         conn.close(); return resp({"ok": True})
 
+    # ── ШОП: КАТЕГОРИИ ──
+    if section == "shop_categories":
+        if body.get("action") == "add":
+            cur.execute(f"INSERT INTO {SCHEMA}.shop_categories (name, description, sort_order) VALUES (%s,%s,%s) RETURNING id",
+                        (body.get("name",""), body.get("description",""), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]; conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "update":
+            cur.execute(f"UPDATE {SCHEMA}.shop_categories SET name=%s, description=%s, sort_order=%s WHERE id=%s",
+                        (body.get("name",""), body.get("description",""), int(body.get("sort_order",0)), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "delete":
+            cur.execute(f"UPDATE {SCHEMA}.shop_categories SET is_active=false WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        active_only = body.get("active_only", False)
+        q = f"SELECT * FROM {SCHEMA}.shop_categories" + (" WHERE is_active=true" if active_only else "") + " ORDER BY sort_order, id"
+        cur.execute(q); rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"categories": rows})
+
+    # ── ШОП: ТОВАРЫ ──
+    if section == "shop_products":
+        if body.get("action") == "add":
+            cur.execute(f"""INSERT INTO {SCHEMA}.shop_products (category_id, name, description, price, photo_url, stock, sort_order)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (body.get("category_id"), body.get("name",""), body.get("description",""),
+                 float(body.get("price",0)), body.get("photo_url",""), int(body.get("stock",0)), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]; conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "update":
+            cur.execute(f"""UPDATE {SCHEMA}.shop_products SET category_id=%s, name=%s, description=%s,
+                price=%s, photo_url=%s, stock=%s, sort_order=%s WHERE id=%s""",
+                (body.get("category_id"), body.get("name",""), body.get("description",""),
+                 float(body.get("price",0)), body.get("photo_url",""), int(body.get("stock",0)),
+                 int(body.get("sort_order",0)), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "toggle":
+            cur.execute(f"UPDATE {SCHEMA}.shop_products SET is_active = NOT is_active WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "delete":
+            cur.execute(f"UPDATE {SCHEMA}.shop_products SET is_active=false WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cat_id = body.get("category_id")
+        active_only = body.get("active_only", False)
+        sql = f"SELECT p.*, c.name as category_name FROM {SCHEMA}.shop_products p LEFT JOIN {SCHEMA}.shop_categories c ON c.id=p.category_id"
+        params = []
+        conditions = []
+        if cat_id: conditions.append("p.category_id=%s"); params.append(cat_id)
+        if active_only: conditions.append("p.is_active=true")
+        if conditions: sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY p.sort_order, p.id"
+        cur.execute(sql, params); rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"products": rows})
+
+    # ── ШОП: ЗАКАЗЫ ──
+    if section == "shop_orders":
+        if body.get("action") == "create":
+            items = body.get("items", [])
+            total = sum(float(it.get("price",0)) * int(it.get("quantity",1)) for it in items)
+            cur.execute(f"""INSERT INTO {SCHEMA}.shop_orders
+                (client_id, client_name, client_phone, delivery_type, delivery_address, pickup_point, total_amount, comment)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (body.get("client_id"), body.get("client_name",""), body.get("client_phone",""),
+                 body.get("delivery_type","sdek"), body.get("delivery_address",""),
+                 body.get("pickup_point",""), total, body.get("comment","")))
+            order_id = cur.fetchone()["id"]
+            for it in items:
+                cur.execute(f"INSERT INTO {SCHEMA}.shop_order_items (order_id, product_id, product_name, price, quantity) VALUES (%s,%s,%s,%s,%s)",
+                            (order_id, it.get("product_id"), it.get("name",""), float(it.get("price",0)), int(it.get("quantity",1))))
+            conn.commit()
+            phone = body.get("client_phone","")
+            if phone: send_sms(phone, f"Girly Paradise: ваш заказ №{order_id} оформлен! Сумма: {total:.0f} ₽. Свяжемся с вами. 🌸")
+            send_sms("79046015556", f"Girly Paradise: новый заказ №{order_id} от {body.get('client_name','')}! {total:.0f} ₽. {body.get('delivery_type','')}: {body.get('pickup_point','')}")
+            conn.close(); return resp({"ok": True, "order_id": order_id, "total": total})
+        if body.get("action") == "update_status":
+            cur.execute(f"UPDATE {SCHEMA}.shop_orders SET status=%s WHERE id=%s", (body.get("status"), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        status_filter = body.get("status")
+        if status_filter:
+            cur.execute(f"SELECT * FROM {SCHEMA}.shop_orders WHERE status=%s ORDER BY created_at DESC LIMIT 100", (status_filter,))
+        else:
+            cur.execute(f"SELECT * FROM {SCHEMA}.shop_orders ORDER BY created_at DESC LIMIT 100")
+        orders = [dict(r) for r in cur.fetchall()]
+        for o in orders:
+            cur.execute(f"SELECT * FROM {SCHEMA}.shop_order_items WHERE order_id=%s", (o["id"],))
+            o["items"] = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"orders": orders})
+
     conn.close()
     return resp({"error": "Unknown section"}, 400)

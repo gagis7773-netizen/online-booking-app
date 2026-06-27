@@ -4,6 +4,29 @@ import Icon from "@/components/ui/icon";
 
 const CHAT_URL = "https://functions.poehali.dev/cadfcb18-918a-427c-a334-5c8c8ace2c06";
 
+// Звук при новом входящем сообщении для клиента
+function playClientMessageSound() {
+  try {
+    const soundOn = localStorage.getItem("gp_client_sound") !== "off";
+    if (!soundOn) return;
+    const ss = JSON.parse(localStorage.getItem("gp_sound_settings") || "{}");
+    const vol = ss.volume ?? 0.4;
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Мягкий двойной «пинг»
+    [[880, 0], [1100, 0.18]].forEach(([freq, delay]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      const t = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(vol * 0.25, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc.start(t); osc.stop(t + 0.45);
+    });
+  } catch { /* silent */ }
+}
+
 const pink = "hsl(335 80% 55%)";
 const pinkBg = "hsl(335 80% 60% / 0.1)";
 const pinkBorder = "hsl(335 50% 85%)";
@@ -20,26 +43,43 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
   const [started, setStarted] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevMsgCount = useRef<number>(0);
+  const chatIdRef = useRef<number | null>(null);
 
   const scroll = () => bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  const loadMessages = async (id: number) => {
+    const res = await fetch(`${CHAT_URL}/messages?chat_id=${id}`);
+    const data = await res.json();
+    const msgs = data.messages || [];
+    // Звук при новом входящем сообщении от менеджера
+    const incoming = msgs.filter((m: any) => m.sender !== "client");
+    if (incoming.length > prevMsgCount.current && prevMsgCount.current > 0) {
+      playClientMessageSound();
+    }
+    prevMsgCount.current = incoming.length;
+    setMessages(msgs);
+  };
 
   useEffect(() => {
     // Восстановить сессию из localStorage
     const saved = localStorage.getItem("girly_chat");
     if (saved) {
       const { chatId: id, name: n, phone: p } = JSON.parse(saved);
-      setChatId(id); setName(n); setPhone(p); setStarted(true);
+      setChatId(id); chatIdRef.current = id;
+      setName(n); setPhone(p); setStarted(true);
       loadMessages(id);
     }
   }, []);
 
-  useEffect(() => { scroll(); }, [messages]);
+  // Поллинг новых сообщений каждые 8 секунд
+  useEffect(() => {
+    if (!started || !chatId) return;
+    const interval = setInterval(() => { if (chatIdRef.current) loadMessages(chatIdRef.current); }, 8000);
+    return () => clearInterval(interval);
+  }, [started, chatId]);
 
-  const loadMessages = async (id: number) => {
-    const res = await fetch(`${CHAT_URL}/messages?chat_id=${id}`);
-    const data = await res.json();
-    setMessages(data.messages || []);
-  };
+  useEffect(() => { scroll(); }, [messages]);
 
   const startChat = async () => {
     if (!name.trim()) return;
@@ -50,6 +90,7 @@ export default function ChatPage({ onBack }: { onBack?: () => void }) {
     });
     const data = await res.json();
     setChatId(data.chat_id);
+    chatIdRef.current = data.chat_id;
     setStarted(true);
     localStorage.setItem("girly_chat", JSON.stringify({ chatId: data.chat_id, name, phone }));
     loadMessages(data.chat_id);

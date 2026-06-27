@@ -1,4 +1,5 @@
 {
+  "shop-api": "https://functions.poehali.dev/9d9106d3-a270-42c0-a3b4-ece98ba93f63",
   "sms-reminder": "https://functions.poehali.dev/f420a51c-3af9-4b9d-920f-0b1046afe424",
   "upload-image": "https://functions.poehali.dev/ccf6566c-3696-4ba5-af83-98e41caa2162",
   "yandex-reviews": "https://functions.poehali.dev/4ef8938c-3c1a-44c7-82d4-d62e6f0546fa",
