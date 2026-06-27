@@ -338,6 +338,13 @@ def handler(event: dict, context) -> dict:
         if body.get("action") == "deactivate":
             cur.execute(f"UPDATE {SCHEMA}.gallery_folders SET sort_order=-1 WHERE id=%s AND id NOT IN (SELECT id FROM {SCHEMA}.gallery_folders WHERE sort_order=-1)", (body.get("id"),))
             conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "delete":
+            folder_id = body.get("id")
+            # Архивируем все фото папки
+            cur.execute(f"UPDATE {SCHEMA}.admin_gallery SET category='archived' WHERE folder_id=%s", (folder_id,))
+            # Скрываем папку (soft delete через sort_order=-2)
+            cur.execute(f"UPDATE {SCHEMA}.gallery_folders SET sort_order=-2 WHERE id=%s", (folder_id,))
+            conn.commit(); conn.close(); return resp({"ok": True})
         cur.execute(f"SELECT * FROM {SCHEMA}.gallery_folders WHERE sort_order >= 0 ORDER BY sort_order, id")
         folders = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"folders": folders})

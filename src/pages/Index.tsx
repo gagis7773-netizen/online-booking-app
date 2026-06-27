@@ -170,26 +170,46 @@ function clearCart() { localStorage.removeItem("gp_cart"); }
 const adminPost = (section: string, extra?: object) =>
   fetch(ADMIN_API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, ...extra }) }).then(r => r.json());
 
-// Загрузка фото в S3 из base64
-async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
+// Сжатие изображения через Canvas перед загрузкой
+async function compressImage(file: File, maxSizePx = 1600, quality = 0.82): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = e.target?.result as string;
-      try {
-        const res = await fetch(UPLOAD_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64, folder }),
-        });
-        const data = await res.json();
-        if (data.url) resolve(data.url);
-        else reject(new Error("No URL"));
-      } catch (err) { reject(err); }
-    };
     reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSizePx || height > maxSizePx) {
+          if (width > height) { height = Math.round((height / width) * maxSizePx); width = maxSizePx; }
+          else { width = Math.round((width / height) * maxSizePx); height = maxSizePx; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(e.target?.result as string); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target?.result as string;
+    };
     reader.readAsDataURL(file);
   });
+}
+
+// Загрузка фото в S3 из base64
+async function uploadPhoto(file: File, folder = "uploads"): Promise<string> {
+  // Сжимаем перед отправкой — уменьшает размер в 5-10 раз
+  const base64 = await compressImage(file);
+  const res = await fetch(UPLOAD_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: base64, folder }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.url) return data.url;
+  throw new Error("No URL in response");
 }
 
 // Загрузка видео с телефона в S3
@@ -3680,6 +3700,12 @@ function AdminGalleryFolders() {
     await adminPost("gallery", { action: "deactivate", id }); loadPhotos(activeFolder.id);
   };
 
+  const deleteFolder = async (f: any) => {
+    if (!window.confirm(`Удалить папку «${f.name}»?\nВсе фото в папке также будут скрыты.`)) return;
+    await adminPost("gallery_folders", { action: "delete", id: f.id });
+    loadFolders();
+  };
+
   if (activeFolder) return (
     <div className="px-4 pb-6">
       <button onClick={() => { setActiveFolder(null); setPhotos([]); }} className="flex items-center gap-2 text-sm mb-4" style={PS}>
@@ -3766,15 +3792,25 @@ function AdminGalleryFolders() {
       {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
       <div className="grid grid-cols-2 gap-3">
         {folders.map(f => (
-          <button key={f.id} onClick={() => openFolder(f)} className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
-            {f.cover_url
-              ? <img src={f.cover_url} className="w-full h-28 object-cover" alt={f.name} />
-              : <div className="w-full h-28 flex items-center justify-center text-4xl" style={{ background: "hsl(335 80% 96%)" }}>🖼</div>}
-            <div className="p-3">
-              <div className="font-semibold text-sm truncate" style={P}>{f.name}</div>
-              {f.description && <div className="text-xs truncate mt-0.5" style={PS}>{f.description}</div>}
+          <div key={f.id} className="card-glow rounded-2xl overflow-hidden relative">
+            <div onClick={() => openFolder(f)} className="cursor-pointer hover:scale-105 transition-all">
+              {f.cover_url
+                ? <img src={f.cover_url} className="w-full h-28 object-cover" alt={f.name} />
+                : <div className="w-full h-28 flex items-center justify-center text-4xl" style={{ background: "hsl(335 80% 96%)" }}>🖼</div>}
+              <div className="p-3">
+                <div className="font-semibold text-sm truncate" style={P}>{f.name}</div>
+                {f.description && <div className="text-xs truncate mt-0.5" style={PS}>{f.description}</div>}
+              </div>
             </div>
-          </button>
+            {/* Кнопка удаления папки */}
+            <button
+              onClick={e => { e.stopPropagation(); deleteFolder(f); }}
+              className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow"
+              style={{ background: "rgba(255,255,255,0.92)", color: "hsl(0 60% 55%)" }}
+              title="Удалить папку">
+              ✕
+            </button>
+          </div>
         ))}
         {!loading && folders.length === 0 && <div className="col-span-2 text-center py-8 text-sm" style={PS}>Папок пока нет</div>}
       </div>
