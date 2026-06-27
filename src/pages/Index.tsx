@@ -1590,6 +1590,12 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   const [reviewText, setReviewText] = useState("");
   const [reviewSent, setReviewSent] = useState(false);
   const [soundOn, setSoundOn] = useState(isClientSoundEnabled());
+  // Отмена / перенос записи
+  const [cancellingBooking, setCancellingBooking] = useState<number | null>(null);
+  const [rescheduleBooking, setRescheduleBooking] = useState<any | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduling, setRescheduling] = useState(false);
   const siteUrl = window.location.href;
 
   const loadShopOrders = () => {
@@ -1600,10 +1606,35 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
       .catch(() => setLoadingOrders(false));
   };
 
-  useEffect(() => {
+  const loadBookings = () => {
+    // Сначала показываем локальные
     const stored = JSON.parse(localStorage.getItem("gp_bookings_" + client.id) || "[]");
     setBookings(stored);
     setLoadingHistory(false);
+    // Потом подгружаем актуальные с сервера (если есть телефон)
+    if (client.phone) {
+      adminPost("schedule", { action: "by_phone", client_phone: client.phone })
+        .then(d => {
+          if (d.bookings && d.bookings.length > 0) {
+            const serverBookings = d.bookings.map((b: any) => ({
+              id: b.id,
+              services: b.services ? [b.services] : ["Процедура"],
+              master: b.master || "",
+              day: b.booking_date || "",
+              time: b.booking_time?.slice(0, 5) || "",
+              status: b.status === "cancelled" ? "cancelled" : "upcoming",
+              server_id: b.id,
+            }));
+            setBookings(serverBookings);
+            localStorage.setItem("gp_bookings_" + client.id, JSON.stringify(serverBookings));
+          }
+        })
+        .catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    loadBookings();
     const handler = (e: any) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -1614,7 +1645,48 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
     if (tab === "orders" && shopOrders.length === 0) loadShopOrders();
   }, [tab]);
 
-  const filtered = bookings.filter((b: any) => b.status === tab);
+  const filtered = bookings.filter((b: any) =>
+    tab === "upcoming" ? (b.status === "upcoming" || b.status === "confirmed") : b.status === tab
+  );
+
+  const cancelBooking = async (b: any) => {
+    setCancellingBooking(b.id);
+    try {
+      if (b.server_id && client.phone) {
+        await adminPost("schedule", { action: "client_cancel", booking_id: b.server_id, client_phone: client.phone });
+      }
+      const updated = bookings.map((x: any) => x.id === b.id ? { ...x, status: "cancelled" } : x);
+      setBookings(updated);
+      localStorage.setItem("gp_bookings_" + client.id, JSON.stringify(updated));
+    } finally {
+      setCancellingBooking(null);
+    }
+  };
+
+  const doReschedule = async () => {
+    if (!rescheduleBooking || !rescheduleDate || !rescheduleTime) return;
+    setRescheduling(true);
+    try {
+      if (rescheduleBooking.server_id && client.phone) {
+        await adminPost("schedule", {
+          action: "client_reschedule",
+          booking_id: rescheduleBooking.server_id,
+          client_phone: client.phone,
+          new_date: rescheduleDate,
+          new_time: rescheduleTime,
+        });
+      }
+      const label = `${rescheduleDate} в ${rescheduleTime}`;
+      const updated = bookings.map((x: any) =>
+        x.id === rescheduleBooking.id ? { ...x, day: rescheduleDate, time: rescheduleTime, status: "upcoming" } : x
+      );
+      setBookings(updated);
+      localStorage.setItem("gp_bookings_" + client.id, JSON.stringify(updated));
+      setRescheduleBooking(null); setRescheduleDate(""); setRescheduleTime("");
+    } finally {
+      setRescheduling(false);
+    }
+  };
 
   // Загрузка фото из галереи телефона
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1859,6 +1931,45 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
                 </button>
               </div>
             )}
+            {/* Модал переноса */}
+            {rescheduleBooking && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
+                onClick={() => setRescheduleBooking(null)}>
+                <div className="w-full max-w-md rounded-t-3xl p-6 space-y-4" style={{ background: "white" }}
+                  onClick={e => e.stopPropagation()}>
+                  <div className="text-base font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Перенести запись</div>
+                  <div className="text-xs mb-1" style={{ color: "hsl(335 30% 60%)" }}>
+                    {Array.isArray(rescheduleBooking.services) ? rescheduleBooking.services.join(", ") : rescheduleBooking.service}
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(335 30% 60%)" }}>Новая дата</label>
+                    <input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)}
+                      min={new Date().toISOString().slice(0, 10)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                      style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(335 30% 60%)" }}>Новое время</label>
+                    <input type="time" value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                      style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setRescheduleBooking(null)}
+                      className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                      style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                      Отмена
+                    </button>
+                    <button onClick={doReschedule} disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                      className="flex-1 py-3 rounded-xl text-sm font-semibold text-white"
+                      style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+                      {rescheduling ? "Переносим..." : "Подтвердить"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {filtered.map((b: any, i: number) => (
               <div key={b.id} className="card-glow rounded-2xl p-4 animate-slide-up" style={{ animationDelay: `${i * 0.08}s` }}>
                 <div className="flex justify-between items-start mb-2">
@@ -1869,16 +1980,37 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
                     <div className="text-xs mt-0.5" style={{ color: "hsl(335 30% 60%)" }}>{b.master || "Галина Сиплатова"}</div>
                   </div>
                   <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
-                    style={b.status === "upcoming"
+                    style={b.status === "upcoming" || b.status === "confirmed"
                       ? { background: "hsl(335 80% 60% / 0.12)", color: "hsl(335 80% 50%)", border: "1px solid hsl(335 80% 80%)" }
                       : { background: "hsl(335 20% 93%)", color: "hsl(335 30% 65%)" }}>
-                    {b.status === "upcoming" ? "Скоро" : "Были"}
+                    {b.status === "upcoming" || b.status === "confirmed" ? "Скоро" : "Были"}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs" style={{ color: "hsl(335 30% 60%)" }}>
+                <div className="flex items-center gap-3 text-xs mb-3" style={{ color: "hsl(335 30% 60%)" }}>
                   <span className="flex items-center gap-1"><Icon name="Calendar" size={11} />{b.day}</span>
                   <span className="flex items-center gap-1"><Icon name="Clock" size={11} />{b.time}</span>
                 </div>
+                {/* Кнопки управления — только для предстоящих */}
+                {(b.status === "upcoming" || b.status === "confirmed") && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setRescheduleBooking(b); setRescheduleDate(""); setRescheduleTime(""); }}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                      style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+                      <Icon name="CalendarClock" size={13} /> Перенести
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm("Отменить запись?")) cancelBooking(b);
+                      }}
+                      disabled={cancellingBooking === b.id}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                      style={{ background: "hsl(0 60% 97%)", color: "hsl(0 60% 50%)", border: "1px solid hsl(0 50% 88%)" }}>
+                      <Icon name="X" size={13} />
+                      {cancellingBooking === b.id ? "Отменяем..." : "Отменить"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -138,6 +138,47 @@ def handler(event: dict, context) -> dict:
         if body.get("action") == "update_status":
             cur.execute(f"UPDATE {SCHEMA}.schedule SET status = %s WHERE id = %s", (body.get("status"), body.get("id")))
             conn.commit(); conn.close(); return resp({"ok": True})
+        # Клиент отменяет свою запись (по phone + id)
+        if body.get("action") == "client_cancel":
+            phone = body.get("client_phone", "")
+            booking_id = body.get("booking_id")
+            cur.execute(f"""
+                UPDATE {SCHEMA}.schedule SET status='cancelled'
+                WHERE id=%s AND client_phone=%s AND status != 'cancelled'
+            """, (booking_id, phone))
+            cur.execute(f"""
+                UPDATE {SCHEMA}.bookings SET status='cancelled'
+                WHERE id=%s AND client_phone=%s
+            """, (booking_id, phone))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        # Клиент переносит запись (по phone + id)
+        if body.get("action") == "client_reschedule":
+            phone = body.get("client_phone", "")
+            booking_id = body.get("booking_id")
+            new_date = body.get("new_date", "")
+            new_time = body.get("new_time", "")
+            cur.execute(f"""
+                UPDATE {SCHEMA}.schedule
+                SET booking_date=%s, booking_time=%s, status='confirmed'
+                WHERE id=%s AND client_phone=%s
+            """, (new_date, new_time, booking_id, phone))
+            cur.execute(f"""
+                UPDATE {SCHEMA}.bookings
+                SET booking_date=%s, booking_time=%s, status='rescheduled'
+                WHERE id=%s AND client_phone=%s
+            """, (new_date, new_time, booking_id, phone))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        # Получить записи клиента по телефону
+        if body.get("action") == "by_phone":
+            phone = body.get("client_phone", "")
+            cur.execute(f"""
+                SELECT id, client_name, services, master, booking_date, booking_time, status, notes, duration
+                FROM {SCHEMA}.schedule
+                WHERE client_phone=%s AND booking_date >= CURRENT_DATE::text
+                ORDER BY booking_date ASC, booking_time ASC
+            """, (phone,))
+            rows = [dict(r) for r in cur.fetchall()]
+            conn.close(); return resp({"bookings": rows})
         cur.execute(f"SELECT * FROM {SCHEMA}.schedule ORDER BY booking_date DESC, booking_time ASC LIMIT 100")
         rows = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"schedule": rows})
