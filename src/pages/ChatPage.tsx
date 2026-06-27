@@ -42,6 +42,7 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
   const [sending, setSending] = useState(false);
   const [started, setStarted] = useState(false);
   const [autoStarting, setAutoStarting] = useState(false);
+  const [startError, setStartError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef<number>(0);
@@ -80,16 +81,22 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
     // Восстановить сессию из localStorage
     const saved = localStorage.getItem("girly_chat");
     if (saved) {
-      const { chatId: id, name: n, phone: p } = JSON.parse(saved);
-      setChatId(id); chatIdRef.current = id;
-      setName(n); setPhone(p); setStarted(true);
-      loadMessages(id);
-      return;
+      try {
+        const { chatId: id, name: n, phone: p } = JSON.parse(saved);
+        if (id) {
+          setChatId(id); chatIdRef.current = id;
+          setName(n || ""); setPhone(p || ""); setStarted(true);
+          loadMessages(id);
+          return;
+        }
+      } catch { localStorage.removeItem("girly_chat"); }
     }
-    // Клиент уже залогинен — стартуем чат автоматически
-    if (client?.name) {
+    // Клиент залогинен с именем — стартуем автоматически
+    if (client?.name?.trim()) {
       setAutoStarting(true);
-      startChat(client.name, client.phone || "").finally(() => setAutoStarting(false));
+      startChat(client.name.trim(), client.phone || "")
+        .catch(() => {})
+        .finally(() => setAutoStarting(false));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -140,12 +147,17 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
   };
 
   if (!started) {
-    // Автозапуск — клиент залогинен, ждём пока чат откроется
+    // Автозапуск — пока ждём
     if (autoStarting) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen animate-fade-in">
+        <div className="flex flex-col items-center justify-center min-h-screen animate-fade-in px-6">
           <div className="text-5xl mb-4 animate-float">💬</div>
-          <p className="text-sm" style={{ color: textMid }}>Открываем чат...</p>
+          <p className="text-sm mb-6" style={{ color: textMid }}>Открываем чат...</p>
+          <button onClick={() => setAutoStarting(false)}
+            className="text-xs px-4 py-2 rounded-xl"
+            style={{ background: pinkBg, color: pink }}>
+            Заполнить вручную
+          </button>
         </div>
       );
     }
@@ -172,10 +184,28 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
               className="w-full px-4 py-3 rounded-xl outline-none text-sm"
               style={{ background: "white", border: `1px solid ${pinkBorder}`, color: textDark }} />
           </div>
-          <button onClick={() => startChat(name, phone)} disabled={!name.trim()}
+          {startError && (
+            <div className="px-3 py-2 rounded-xl text-xs text-center" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 45%)" }}>
+              {startError}
+            </div>
+          )}
+          <button
+            onClick={async () => {
+              if (!name.trim()) return;
+              setStartError("");
+              setAutoStarting(true);
+              try {
+                await startChat(name.trim(), phone);
+              } catch {
+                setStartError("Не удалось подключиться. Проверьте интернет и попробуйте снова.");
+              } finally {
+                setAutoStarting(false);
+              }
+            }}
+            disabled={!name.trim() || autoStarting}
             className="w-full py-4 rounded-2xl font-semibold text-white text-base shadow-md"
             style={{ background: name.trim() ? `linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))` : "hsl(335 20% 88%)", color: name.trim() ? "white" : "hsl(335 20% 65%)" }}>
-            Начать чат 🌸
+            {autoStarting ? "Подключаемся..." : "Начать чат 🌸"}
           </button>
         </div>
         <div className="card-glow rounded-2xl p-4 mt-4">
