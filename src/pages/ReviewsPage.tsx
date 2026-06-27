@@ -264,74 +264,77 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
 
       {/* Форма отзыва */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.5)" }}
           onClick={() => setShowForm(false)}>
-          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "white", maxHeight: "92vh" }}
+          <div className="w-full max-w-lg mx-auto rounded-t-3xl flex flex-col"
+            style={{ background: "white", maxHeight: "80dvh" }}
             onClick={e => e.stopPropagation()}>
 
-            {/* Шапка с кнопкой отправки — всегда видна */}
-            <div className="px-6 pt-5 pb-4 flex-shrink-0 border-b" style={{ borderColor: "hsl(335 30% 92%)" }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-oswald font-bold" style={{ color: textDark }}>Ваш отзыв</h2>
+            {/* Шапка: заголовок + звёзды + кнопка */}
+            <div className="px-5 pt-4 pb-3 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-oswald font-bold" style={{ color: textDark }}>Ваш отзыв</h2>
                 <button onClick={() => setShowForm(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
                   style={{ background: "hsl(335 20% 93%)", color: textMid }}>✕</button>
               </div>
-              {/* Звёзды в шапке */}
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-1.5 mb-3">
                 {[1,2,3,4,5].map(s => (
                   <button key={s} onClick={() => setRating(s)}
-                    style={{ fontSize: 32, color: s <= rating ? "#f59e0b" : "hsl(335 20% 85%)" }}>★</button>
+                    style={{ fontSize: 28, color: s <= rating ? "#f59e0b" : "hsl(335 20% 85%)" }}>★</button>
                 ))}
               </div>
-              {/* Кнопка отправить — всегда вверху */}
-              <button onClick={submit} disabled={sending || !name.trim() || !text.trim()}
-                className="w-full py-3.5 rounded-2xl font-bold text-base shadow-md transition-all"
-                style={name.trim() && text.trim()
-                  ? { ...GRAD, color: "white" }
-                  : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
-                {sending ? "Отправляем..." : "Опубликовать отзыв ✓"}
-              </button>
             </div>
 
-            {/* Поля — скроллируются */}
-            <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 pb-8">
+            {/* Поля — скроллируемая зона */}
+            <div className="px-5 overflow-y-auto flex-1 space-y-3">
               <div>
-                <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Ваше имя *</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: textMid }}>Ваше имя *</label>
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Имя"
-                  className="w-full px-4 py-3 rounded-xl outline-none text-sm"
+                  className="w-full px-3 py-2.5 rounded-xl outline-none text-sm"
                   style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
               </div>
-
               <div>
-                <label className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: textMid }}>Отзыв *</label>
-                <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Поделитесь впечатлением..." rows={5}
-                  className="w-full px-4 py-3 rounded-xl outline-none text-sm resize-none"
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: textMid }}>Отзыв *</label>
+                <textarea value={text} onChange={e => setText(e.target.value)}
+                  placeholder="Поделитесь впечатлением..." rows={3}
+                  className="w-full px-3 py-2.5 rounded-xl outline-none text-sm resize-none"
                   style={{ background: "hsl(335 30% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }} />
               </div>
+            </div>
 
-              {/* Прикрепить фото из галереи */}
-              <div>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+            {/* Подвал: фото + отправить — прилипает над клавиатурой */}
+            <div className="px-5 pt-3 pb-4 flex-shrink-0 border-t space-y-2"
+              style={{ borderColor: "hsl(335 30% 92%)", paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+              {photo && (
+                <div className="relative mb-1">
+                  <img src={`data:image/jpeg;base64,${photo.data}`} alt="preview"
+                    className="w-full h-24 object-cover rounded-xl" />
+                  <button onClick={() => setPhoto(null)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ background: "rgba(0,0,0,0.55)", color: "white" }}>✕</button>
+                </div>
+              )}
+              <div className="flex gap-2">
                 <button onClick={() => fileRef.current?.click()}
-                  className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                  className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold flex-shrink-0"
                   style={photo
                     ? { background: "hsl(142 50% 94%)", color: "hsl(142 55% 35%)", border: "1.5px solid hsl(142 50% 78%)" }
                     : { background: "hsl(335 30% 96%)", color: "hsl(335 50% 50%)", border: `1.5px dashed ${pinkBorder}` }}>
                   <span style={{ fontSize: 18 }}>📷</span>
-                  {photo ? `✓ ${photo.name}` : "Прикрепить фото из галереи"}
+                  {photo ? "Фото ✓" : "Фото"}
                 </button>
-                {photo && (
-                  <div className="mt-2 relative">
-                    <img src={`data:image/jpeg;base64,${photo.data}`} alt="preview"
-                      className="w-full h-40 object-cover rounded-xl" />
-                    <button onClick={() => setPhoto(null)}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold"
-                      style={{ background: "rgba(0,0,0,0.5)", color: "white" }}>✕</button>
-                  </div>
-                )}
+                <button onClick={submit} disabled={sending || !name.trim() || !text.trim()}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm shadow-md transition-all"
+                  style={name.trim() && text.trim()
+                    ? { ...GRAD, color: "white" }
+                    : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+                  {sending ? "Отправляем..." : "Опубликовать отзыв ✓"}
+                </button>
               </div>
             </div>
+
           </div>
         </div>
       )}
