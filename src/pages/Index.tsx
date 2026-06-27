@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import ReviewsPage from "./ReviewsPage";
 import ChatPage from "./ChatPage";
 
-const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/14d6f8e1-0772-4340-a687-4fe03df40989.png";
+const LOGO_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/11e394f0-e373-4e52-bea5-7b8a5ce187c2.png";
 const QR_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/2b4d4c5d-2ea0-4fb1-8548-564f4e7eb33c.png";
 const SALON_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/890adaa5-bbaa-4546-9c4e-2406379ded6a.jpg";
-const PRICE_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/files/f4378294-5088-4fed-866f-23d184cb3882.jpg";
+const PRICE_IMG = "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&q=85";
 const GALINA_IMG = "https://cdn.poehali.dev/projects/5f8fa1c3-7bb5-4e9b-a111-7b9182713699/bucket/8f8e57f4-caad-4931-8d8a-bea880feb389.jpg";
 
 const AUTH_URL = "https://functions.poehali.dev/888bfad7-6580-4f39-b963-78aca5d4d8c0";
@@ -169,7 +169,30 @@ export default function Index() {
     setPage("home");
   };
 
+  // Хранилище позиций прокрутки для каждой страницы
+  const scrollPositions = React.useRef<Record<string, number>>({});
+
+  const navigateTo = (newPage: Page) => {
+    // Сохраняем текущую позицию прокрутки перед уходом
+    scrollPositions.current[page] = window.scrollY;
+    setPage(newPage);
+    // Для новых страниц — скроллим наверх
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  const navigateBack = (targetPage: Page) => {
+    // Сохраняем позицию текущей страницы
+    scrollPositions.current[page] = window.scrollY;
+    setPage(targetPage);
+    // Восстанавливаем позицию на странице, куда возвращаемся
+    requestAnimationFrame(() => {
+      const savedPos = scrollPositions.current[targetPage] || 0;
+      window.scrollTo({ top: savedPos, behavior: "instant" });
+    });
+  };
+
   const startBooking = () => {
+    scrollPositions.current[page] = window.scrollY;
     setBookingStep(1);
     setSelectedServices([]);
     setSelectedMaster(null);
@@ -177,6 +200,7 @@ export default function Index() {
     setSelectedTime(null);
     setBookingDone(false);
     setPage("booking");
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   const confirmBooking = () => {
@@ -202,8 +226,8 @@ export default function Index() {
 
       <div className="relative z-10 pb-24">
         {page === "home" && <HomePage setPage={setPage} startBooking={startBooking} client={client} masters={masters} siteSettings={siteSettings} />}
-        {page === "pricelist" && <PriceListPage setPage={setPage} startBooking={startBooking} />}
-        {page === "masters" && <MastersPage masters={masters} setPage={setPage} startBooking={startBooking} />}
+        {page === "pricelist" && <PriceListPage setPage={navigateTo} onBack={() => navigateBack("home")} startBooking={startBooking} />}
+        {page === "masters" && <MastersPage masters={masters} setPage={navigateTo} onBack={() => navigateBack("home")} startBooking={startBooking} />}
         {page === "booking" && (
           <BookingPage
             step={bookingStep}
@@ -230,25 +254,25 @@ export default function Index() {
         {page === "profile" && (
           <ProfilePage client={client} onLogin={handleLogin} onLogout={handleLogout} setPage={setPage} />
         )}
-        {page === "reviews" && <ReviewsPage onBack={() => setPage("home")} />}
-        {page === "gallery" && <ClientGalleryPage setPage={setPage} />}
-        {page === "documents" && <ClientDocumentsPage setPage={setPage} />}
-        {page === "chat" && <ChatPage onBack={() => setPage("home")} />}
-        {page === "admin" && <AdminPage onBack={() => setPage("home")} />}
+        {page === "reviews" && <ReviewsPage onBack={() => navigateBack("home")} />}
+        {page === "gallery" && <ClientGalleryPage setPage={navigateTo} onBack={() => navigateBack("home")} />}
+        {page === "documents" && <ClientDocumentsPage setPage={navigateTo} onBack={() => navigateBack("home")} />}
+        {page === "chat" && <ChatPage onBack={() => navigateBack("home")} />}
+        {page === "admin" && <AdminPage onBack={() => navigateBack("home")} />}
       </div>
 
-      <BottomNav page={page} setPage={setPage} />
+      <BottomNav page={page} setPage={navigateTo} />
     </div>
   );
 }
 
 // ─── HOME ───────────────────────────────────────────────────────────────────
 
-function HomePage({ setPage, startBooking, client, masters, siteSettings }: { setPage: (p: Page) => void; startBooking: () => void; client: any; masters: any[]; siteSettings: Record<string, string> }) {
+function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSettings }: { setPage: (p: Page) => void; startBooking: () => void; client: any; masters: any[]; siteSettings: Record<string, string> }) {
   const [pressTimer, setPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLogoPress = () => {
-    const t = setTimeout(() => setPage("admin"), 2000);
+    const t = setTimeout(() => navigateTo("admin"), 2000);
     setPressTimer(t);
   };
   const handleLogoRelease = () => {
@@ -257,6 +281,8 @@ function HomePage({ setPage, startBooking, client, masters, siteSettings }: { se
 
   const heroImg = siteSettings.hero_image_url || SALON_IMG;
   const wallImg = siteSettings.wall_image_url || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=85";
+  const wallTitle = siteSettings.wall_title || "Наш салон";
+  const wallSubtitle = siteSettings.wall_subtitle || "Girly Paradise Beauty Apartments";
   const btnColor = siteSettings.hero_color_from || "hsl(335 80% 58%)";
   const btnGrad = { background: `linear-gradient(135deg, ${btnColor}, ${siteSettings.hero_color_to || "hsl(315 70% 65%)"})` };
   const salonPhone = siteSettings.salon_phone || "+79046015556";
@@ -272,11 +298,10 @@ function HomePage({ setPage, startBooking, client, masters, siteSettings }: { se
           background: "linear-gradient(to bottom, rgba(255,220,230,0.15) 0%, rgba(255,182,193,0.25) 40%, rgba(255,240,245,0.96) 100%)"
         }} />
         <div className="absolute top-0 left-0 right-0 p-4 flex items-start justify-between">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg cursor-pointer select-none"
-            style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)" }}
+          <div className="w-28 h-28 flex items-center justify-center cursor-pointer select-none drop-shadow-lg"
             onMouseDown={handleLogoPress} onMouseUp={handleLogoRelease} onMouseLeave={handleLogoRelease}
             onTouchStart={handleLogoPress} onTouchEnd={handleLogoRelease}>
-            <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
+            <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain" style={{ filter: "drop-shadow(0 2px 8px rgba(255,182,193,0.5))" }} />
           </div>
           <div className="flex flex-col items-end gap-1.5 pt-1">
             <a href={`tel:${salonPhone}`}
@@ -331,21 +356,21 @@ function HomePage({ setPage, startBooking, client, masters, siteSettings }: { se
         </div>
       </div>
 
-      {/* Картина на стене */}
+      {/* Фото нашего салона */}
       <div className="px-4 mb-5">
         <div className="relative rounded-3xl overflow-hidden shadow-xl" style={{ height: 220 }}>
           <img
             src={wallImg}
-            alt="Красота и стиль"
-            className="w-full h-full object-cover object-top"
+            alt={wallTitle}
+            className="w-full h-full object-cover object-center"
           />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(255,235,242,0.85) 100%)" }} />
-          <div className="absolute bottom-3 left-4">
-            <p className="text-sm font-semibold font-oswald" style={{ color: "hsl(335 60% 28%)" }}>Красота — это искусство</p>
-            <p className="text-xs" style={{ color: "hsl(335 40% 50%)" }}>Girly Paradise Beauty</p>
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(255,235,242,0.82) 100%)" }} />
+          <div className="absolute bottom-3 left-4 right-4">
+            <p className="text-base font-bold font-oswald" style={{ color: "hsl(335 60% 25%)", textShadow: "0 1px 4px rgba(255,255,255,0.7)" }}>{wallTitle}</p>
+            <p className="text-xs mt-0.5" style={{ color: "hsl(335 40% 50%)" }}>{wallSubtitle}</p>
           </div>
-          {/* Рамка как картина */}
-          <div className="absolute inset-1 rounded-2xl pointer-events-none" style={{ border: "2px solid rgba(255,255,255,0.4)" }} />
+          {/* Рамка */}
+          <div className="absolute inset-1 rounded-2xl pointer-events-none" style={{ border: "1.5px solid rgba(255,255,255,0.45)" }} />
         </div>
       </div>
 
@@ -410,7 +435,7 @@ const PriceSearchInput = ({ value, onChange }: { value: string; onChange: (v: st
   </div>
 );
 
-function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; startBooking: () => void }) {
+function PriceListPage({ setPage, onBack, startBooking }: { setPage: (p: Page) => void; onBack?: () => void; startBooking: () => void }) {
   const [priceItems, setPriceItems] = useState<any[]>([]);
   const [priceLoaded, setPriceLoaded] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Все");
@@ -456,7 +481,7 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
         <img src={PRICE_IMG} alt="Прайс-лист" className="w-full h-full object-cover" />
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(255,220,230,0.1) 0%, rgba(255,240,245,0.88) 100%)" }} />
         <div className="absolute top-3 left-3">
-          <button onClick={() => setPage("home")} className="w-9 h-9 rounded-full flex items-center justify-center"
+          <button onClick={() => onBack ? onBack() : setPage("home")} className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(8px)" }}>
             <Icon name="ChevronLeft" size={18} style={{ color: "hsl(335 60% 40%)" }} />
           </button>
@@ -531,7 +556,7 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
 
 type Master = { id: number; name: string; spec: string; rating: number; reviews_count: number; img: string; tags: string[] };
 
-function MastersPage({ masters: mList, setPage, startBooking }: { masters: Master[]; setPage: (p: Page) => void; startBooking: () => void }) {
+function MastersPage({ masters: mList, setPage, onBack, startBooking }: { masters: Master[]; setPage: (p: Page) => void; onBack?: () => void; startBooking: () => void }) {
   const [fullscreenImg, setFullscreenImg] = useState<string | null>(null);
 
   return (
@@ -545,7 +570,7 @@ function MastersPage({ masters: mList, setPage, startBooking }: { masters: Maste
       )}
 
       <div className="px-4 pt-12 pb-6 flex items-center gap-3">
-        <button onClick={() => setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+        <button onClick={() => onBack ? onBack() : setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
           <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
         </button>
@@ -1387,6 +1412,15 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
+          {/* Кнопка записать клиента — всегда видна */}
+          <button
+            onClick={() => setSection("schedule")}
+            className="w-full py-4 rounded-2xl font-bold text-white shadow-lg mb-4 flex items-center justify-center gap-2 text-base"
+            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 20px hsl(335 80% 65% / 0.4)" }}>
+            <Icon name="CalendarPlus" size={20} className="text-white" />
+            Записать клиента
+          </button>
+
           {/* Краткая сводка на главной */}
           {isOwner && stats && (
             <div className="grid grid-cols-3 gap-2 mb-5">
@@ -2871,44 +2905,6 @@ function AdminPricelistEditor() {
   const grouped: Record<string, any[]> = {};
   items.forEach(it => { if (!grouped[it.category]) grouped[it.category] = []; grouped[it.category].push(it); });
 
-  const FormBlock = () => (
-    <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
-      {[{ k: "name", l: "Название услуги", ph: "Криолиполиз 2 зоны" }, { k: "price", l: "Цена", ph: "3 500 ₽" }, { k: "duration", l: "Длительность", ph: "60 мин" }, { k: "description", l: "Описание", ph: "Необязательно" }].map(f => (
-        <div key={f.k}>
-          <label className="text-xs font-medium block mb-1" style={PS}>{f.l}</label>
-          <input value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
-            placeholder={f.ph} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
-        </div>
-      ))}
-      <div>
-        <label className="text-xs font-medium block mb-1" style={PS}>Фото услуги</label>
-        <PhotoUploadButton folder="pricelist" label="📷 Выбрать фото из галереи" uploading={uploadingServicePhoto}
-          setUploading={setUploadingServicePhoto} onUploaded={url => setForm(p => ({ ...p, photo_url: url }))} className="w-full mb-2" />
-        {form.photo_url && <img src={form.photo_url} className="w-full h-36 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
-      </div>
-      <div>
-        <label className="text-xs font-medium block mb-1" style={PS}>Категория</label>
-        <div className="flex flex-wrap gap-2">
-          {cats.map(c => (
-            <button key={c} onClick={() => setForm(p => ({ ...p, category: c }))}
-              className="px-3 py-1.5 rounded-xl text-xs font-medium"
-              style={form.category === c ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <button onClick={save} disabled={saving} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
-          {saving ? "Сохраняем..." : editing ? "Сохранить" : "Добавить"}
-        </button>
-        <button onClick={() => { resetForm(); setAdding(false); setEditing(null); }} className="px-4 py-3 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
-          Отмена
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="px-4 pb-6">
       <p className="text-xs mb-3" style={PS}>Услуги здесь отображаются клиентам в Прайс-листе</p>
@@ -2917,7 +2913,62 @@ function AdminPricelistEditor() {
           + Добавить услугу
         </button>
       )}
-      {(adding || editing) && <FormBlock />}
+      {/* Форма — встроенный JSX, НЕ отдельный компонент, чтобы клавиатура не пропадала */}
+      {(adding || editing) && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Название услуги</label>
+            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="Криолиполиз 2 зоны" autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Цена</label>
+            <input value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
+              placeholder="3 500 ₽" autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Длительность</label>
+            <input value={form.duration} onChange={e => setForm(p => ({ ...p, duration: e.target.value }))}
+              placeholder="60 мин" autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Описание</label>
+            <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Необязательно" autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Фото услуги</label>
+            <PhotoUploadButton folder="pricelist" label="📷 Выбрать фото" uploading={uploadingServicePhoto}
+              setUploading={setUploadingServicePhoto} onUploaded={url => setForm(p => ({ ...p, photo_url: url }))} className="w-full mb-2" />
+            {form.photo_url && <img src={form.photo_url} className="w-full h-36 object-cover rounded-xl" alt="preview" onError={e => (e.currentTarget.style.display = "none")} />}
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Категория</label>
+            <div className="flex flex-wrap gap-2">
+              {cats.map(c => (
+                <button key={c} onClick={() => setForm(p => ({ ...p, category: c }))}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium"
+                  style={form.category === c ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              {saving ? "Сохраняем..." : editing ? "Сохранить" : "Добавить"}
+            </button>
+            <button onClick={() => { resetForm(); setAdding(false); setEditing(null); }}
+              className="px-4 py-3 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
       {Object.entries(grouped).map(([cat, catItems]) => (
@@ -3278,7 +3329,7 @@ function AdminBroadcast() {
 }
 
 // ── Публичная галерея для клиентов ──
-function ClientGalleryPage({ setPage }: { setPage: (p: Page) => void }) {
+function ClientGalleryPage({ setPage, onBack }: { setPage: (p: Page) => void; onBack?: () => void }) {
   const [folders, setFolders] = useState<any[]>([]);
   const [activeFolder, setActiveFolder] = useState<any | null>(null);
   const [photos, setPhotos] = useState<any[]>([]);
@@ -3311,7 +3362,7 @@ function ClientGalleryPage({ setPage }: { setPage: (p: Page) => void }) {
             <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
           </button>
         ) : (
-          <button onClick={() => setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          <button onClick={() => onBack ? onBack() : setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
             style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
             <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
           </button>
@@ -3809,6 +3860,8 @@ function AdminSiteSettings() {
           { key: "salon_phone", label: "Телефон" },
           { key: "salon_address", label: "Адрес" },
           { key: "salon_maps_url", label: "Ссылка на Яндекс Карты" },
+          { key: "wall_title", label: "Заголовок на фото салона" },
+          { key: "wall_subtitle", label: "Подзаголовок на фото салона" },
         ].map(f => (
           <div key={f.key}>
             <label className="text-xs block mb-1" style={PS}>{f.label}</label>
@@ -3856,7 +3909,7 @@ function AdminSiteSettings() {
 }
 
 // ── Публичная страница документов ──
-function ClientDocumentsPage({ setPage }: { setPage: (p: Page) => void }) {
+function ClientDocumentsPage({ setPage, onBack }: { setPage: (p: Page) => void; onBack?: () => void }) {
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullscreen] = useState<string | null>(null);
@@ -3879,7 +3932,7 @@ function ClientDocumentsPage({ setPage }: { setPage: (p: Page) => void }) {
   return (
     <div className="animate-fade-in">
       <div className="px-4 pt-12 pb-4 flex items-center gap-3">
-        <button onClick={() => setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+        <button onClick={() => onBack ? onBack() : setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
           <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
         </button>
