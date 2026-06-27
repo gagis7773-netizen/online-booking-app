@@ -4,6 +4,38 @@ import Icon from "@/components/ui/icon";
 import ReviewsPage from "./ReviewsPage";
 import ChatPage from "./ChatPage";
 
+// ── Пуш-уведомления (Service Worker) ──
+async function registerPush(): Promise<boolean> {
+  try {
+    if (!("serviceWorker" in navigator) || !("Notification" in window)) return false;
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return false;
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    localStorage.setItem("gp_push_enabled", "true");
+    // Сохраняем endpoint для будущих уведомлений (у нас без VAPID — используем local push)
+    if (reg.pushManager) {
+      localStorage.setItem("gp_push_granted", "true");
+    }
+    return true;
+  } catch { return false; }  
+}
+
+function isPushEnabled() {
+  return localStorage.getItem("gp_push_enabled") === "true" && Notification.permission === "granted";
+}
+
+// Показать локальное пуш-уведомление (через SW)
+async function showPushNotification(title: string, body: string, tag = "girly") {
+  try {
+    if (!isPushEnabled()) return;
+    const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+    if (reg) {
+      reg.showNotification(title, { body, icon: "/favicon.ico", tag, vibrate: [200, 100, 200] });
+    }
+  } catch (e) { void e; }
+}
+
 // ── Звуковые уведомления ──
 const SOUND_PRESETS: Record<string, { label: string; freq: number[]; type: OscillatorType; dur?: number }> = {
   bell: { label: "Колокольчик 🔔", freq: [880, 1100, 880], type: "sine" },
@@ -353,6 +385,10 @@ export default function Index() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // Регистрируем Service Worker при старте
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
     adminPost("site_settings").then(d => setSiteSettings(d.settings || {})).catch(() => {});
     adminPost("masters", { active_only: true }).then(d => {
       if (d.masters && d.masters.length > 0) {
@@ -1561,6 +1597,30 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
           </button>
         </div>
 
+        {/* Пуш-уведомления для клиента */}
+        {!isPushEnabled() && (
+          <button
+            onClick={async () => {
+              const ok = await registerPush();
+              if (ok) {
+                await showPushNotification("Girly Paradise 🌸", "Отлично! Теперь вы будете первыми узнавать об акциях и новостях салона.");
+              } else {
+                alert("Разреши уведомления в настройках браузера");
+              }
+            }}
+            className="w-full py-3 rounded-2xl text-sm font-semibold mb-4 flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, hsl(270 60% 58%), hsl(300 60% 62%))", color: "white", boxShadow: "0 3px 12px hsl(270 60% 70% / 0.4)" }}>
+            <Icon name="Bell" size={16} className="text-white" />
+            Включить уведомления 📲
+          </button>
+        )}
+        {isPushEnabled() && (
+          <div className="w-full py-2.5 rounded-2xl text-xs font-medium text-center mb-4"
+            style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>
+            ✅ Уведомления включены
+          </div>
+        )}
+
         {/* Поделиться — выбор мессенджера */}
         {showShare && (
           <div className="card-glow rounded-2xl p-4 mb-4 animate-slide-up">
@@ -1674,9 +1734,18 @@ function AdminPage({ onBack }: { onBack: () => void }) {
   const [adminUser, setAdminUser] = useState<any>(loadAdminSession());
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [stats, setStats] = useState<any>(null);
+  const [badges, setBadges] = useState<{ unread_msgs: number; new_orders: number }>({ unread_msgs: 0, new_orders: 0 });
+
+  const loadBadges = () => adminPost("badge_counts").then(d => setBadges(d)).catch(() => {});
 
   useEffect(() => {
-    if (adminUser) adminPost("stats").then(d => setStats(d)).catch(() => {});
+    if (adminUser) {
+      adminPost("stats").then(d => setStats(d)).catch(() => {});
+      loadBadges();
+      // Обновляем бейджи каждые 20 секунд
+      const interval = setInterval(loadBadges, 20000);
+      return () => clearInterval(interval);
+    }
   }, [adminUser]);
 
   const handleLogin = (user: any) => { saveAdminSession(user); setAdminUser(user); };
@@ -1732,21 +1801,33 @@ function AdminPage({ onBack }: { onBack: () => void }) {
               Записать клиента
             </button>
             <button
-              onClick={() => setSection("messages")}
-              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm"
+              onClick={() => { setSection("messages"); loadBadges(); }}
+              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm relative"
               style={{ background: "white", color: "hsl(335 70% 45%)", border: "2px solid hsl(335 70% 78%)", boxShadow: "0 4px 16px hsl(335 50% 85% / 0.5)" }}>
               <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 70% 45%)" }} />
               Сообщения
+              {badges.unread_msgs > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center text-white z-10"
+                  style={{ background: "hsl(0 80% 55%)" }}>
+                  {badges.unread_msgs > 99 ? "99+" : badges.unread_msgs}
+                </span>
+              )}
             </button>
           </div>
           {/* Заказы магазина */}
           {isOwner && (
             <button
-              onClick={() => setSection("shop_admin")}
-              className="w-full py-3 rounded-2xl font-semibold shadow flex items-center justify-center gap-2 text-sm mb-4"
+              onClick={() => { setSection("shop_admin"); loadBadges(); }}
+              className="w-full py-3 rounded-2xl font-semibold shadow flex items-center justify-center gap-2 text-sm mb-4 relative"
               style={{ background: "linear-gradient(135deg, hsl(315 70% 65%), hsl(270 60% 62%))", color: "white", boxShadow: "0 3px 12px hsl(315 70% 75% / 0.4)" }}>
               <Icon name="ShoppingBag" size={17} className="text-white" />
               Заказы магазина
+              {badges.new_orders > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center text-white z-10"
+                  style={{ background: "hsl(0 80% 55%)" }}>
+                  {badges.new_orders > 99 ? "99+" : badges.new_orders}
+                </span>
+              )}
             </button>
           )}
 
@@ -3008,6 +3089,13 @@ function AdminMessages() {
           if (ss.enabled !== false) {
             playNotificationSound(ss.preset || "bell", Number(ss.volume ?? 0.5));
           }
+          // Пуш-уведомление для администратора
+          const newCount = totalNew - prevCount.current;
+          showPushNotification(
+            "Girly Paradise 🌸",
+            `${newCount > 1 ? `${newCount} новых сообщений` : "Новое сообщение"} от клиентов`,
+            "new-message"
+          );
         }
         prevCount.current = totalNew;
       }
@@ -4767,6 +4855,30 @@ function AdminSiteSettings() {
         ))}
       </div>
 
+      {/* Реквизиты оплаты */}
+      <div className="card-glow rounded-2xl p-4 space-y-3">
+        <div>
+          <div className="font-semibold text-sm mb-0.5" style={P}>Реквизиты для оплаты 💳</div>
+          <p className="text-xs mb-3" style={PS}>Клиенты увидят эти данные при оплате заказа картой/СБП</p>
+        </div>
+        {[
+          { key: "payment_phone_sbp", label: "Телефон для СБП (перевод по номеру)" },
+          { key: "payment_card_number", label: "Номер карты (необязательно)" },
+          { key: "payment_bank_name", label: "Название банка" },
+          { key: "payment_recipient_name", label: "Имя получателя (как на карте)" },
+        ].map(f => (
+          <div key={f.key}>
+            <label className="text-xs block mb-1" style={PS}>{f.label}</label>
+            <input value={settings[f.key] || ""} onChange={e => set(f.key, e.target.value)}
+              placeholder={f.key === "payment_phone_sbp" ? "+7 900 000-00-00" : f.key === "payment_card_number" ? "0000 0000 0000 0000" : ""}
+              autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+        ))}
+        <button onClick={saveAll} disabled={saving} className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : "💾 Сохранить реквизиты"}
+        </button>
+      </div>
+
       {/* Выходные дни */}
       <div className="card-glow rounded-2xl p-4">
         <div className="font-semibold text-sm mb-1" style={P}>Выходные дни</div>
@@ -5128,6 +5240,45 @@ function AdminSettings() {
         style={GRAD}>
         🔔 Проверить звук уведомления
       </button>
+
+      {/* Пуш-уведомления */}
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold text-sm mb-1" style={P}>Пуш-уведомления 📲</div>
+        <p className="text-xs mb-3" style={PS}>
+          Уведомления на экране даже когда приложение свёрнуто. Статус: {" "}
+          <span style={{ color: isPushEnabled() ? "hsl(142 60% 40%)" : "hsl(335 50% 55%)", fontWeight: 600 }}>
+            {isPushEnabled() ? "✅ Включены" : "⭕ Выключены"}
+          </span>
+        </p>
+        {!isPushEnabled() ? (
+          <button
+            onClick={async () => {
+              const ok = await registerPush();
+              if (ok) {
+                await showPushNotification("Girly Paradise 🌸", "Пуш-уведомления успешно включены! Теперь вы будете получать уведомления о новых сообщениях и заказах.");
+                // Принудительно перерендерить
+                window.location.reload();
+              } else {
+                alert("Не удалось включить уведомления. Проверь настройки браузера — разрешение на уведомления должно быть разрешено.");
+              }
+            }}
+            className="w-full py-3 rounded-2xl font-semibold text-white"
+            style={GRAD}>
+            📲 Включить пуш-уведомления
+          </button>
+        ) : (
+          <button
+            onClick={async () => {
+              localStorage.removeItem("gp_push_enabled");
+              localStorage.removeItem("gp_push_granted");
+              window.location.reload();
+            }}
+            className="w-full py-2.5 rounded-xl text-sm font-medium"
+            style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+            Отключить пуш-уведомления
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -5206,17 +5357,20 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
   const [view, setView] = React.useState<"catalog" | "cart" | "checkout" | "done">("catalog");
   const [categories, setCategories] = React.useState<any[]>([]);
   const [products, setProducts] = React.useState<any[]>([]);
+  const [banners, setBanners] = React.useState<any[]>([]);
   const [activeCat, setActiveCat] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [cart, setCart] = React.useState<any[]>(getCart());
   const [selectedProduct, setSelectedProduct] = React.useState<any | null>(null);
   // Форма оформления
   const [deliveryType, setDeliveryType] = React.useState<"sdek" | "ozon" | "post">("sdek");
+  const [paymentMethod, setPaymentMethod] = React.useState<"on_delivery" | "card">("card");
   const [address, setAddress] = React.useState("");
   const [pickupPoint, setPickupPoint] = React.useState("");
   const [comment, setComment] = React.useState("");
   const [placing, setPlacing] = React.useState(false);
   const [orderId, setOrderId] = React.useState<number | null>(null);
+  const [paymentInfo, setPaymentInfo] = React.useState<Record<string, string> | null>(null);
 
   const P2 = { color: "hsl(335 50% 28%)" };
   const PS2 = { color: "hsl(335 30% 58%)" };
@@ -5227,6 +5381,7 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
       setCategories(d.categories || []);
       if (d.categories?.length > 0) setActiveCat(d.categories[0].id);
     });
+    adminPost("shop_banners", { active_only: true }).then(d => setBanners(d.banners || []));
   }, []);
 
   React.useEffect(() => {
@@ -5256,10 +5411,14 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
       pickup_point: pickupPoint,
       comment,
       items: cart,
+      payment_method: paymentMethod,
     });
     if (res.ok) {
       setOrderId(res.order_id);
       clearCart(); refreshCart();
+      if (paymentMethod === "card" && res.payment_info) {
+        setPaymentInfo(res.payment_info);
+      }
       setView("done");
     }
     setPlacing(false);
@@ -5272,15 +5431,68 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
   ] as const;
 
   if (view === "done") return (
-    <div className="animate-fade-in min-h-screen flex flex-col items-center justify-center px-8 text-center">
-      <div className="text-6xl mb-5">🎉</div>
-      <h2 className="text-2xl font-oswald font-bold mb-3" style={P2}>Заказ оформлен!</h2>
-      <p className="text-sm mb-2" style={PS2}>Номер заказа: <strong>#{orderId}</strong></p>
-      <p className="text-sm mb-8" style={PS2}>Мы свяжемся с вами для подтверждения. Проверь SMS на телефоне.</p>
-      <button onClick={() => { setView("catalog"); }} className="w-full py-4 rounded-2xl font-bold text-white" style={GRAD2}>
+    <div className="animate-fade-in pb-8 pt-12 px-6">
+      <div className="text-center mb-6">
+        <div className="text-6xl mb-4">🎉</div>
+        <h2 className="text-2xl font-oswald font-bold mb-2" style={P2}>Заказ оформлен!</h2>
+        <p className="text-sm mb-1" style={PS2}>Номер заказа: <strong>#{orderId}</strong></p>
+        <p className="text-sm" style={PS2}>Проверь SMS — пришло подтверждение.</p>
+      </div>
+
+      {/* Реквизиты оплаты (если выбрана карта) */}
+      {paymentMethod === "card" && (
+        <div className="card-glow rounded-2xl p-5 mb-5" style={{ border: "2px solid hsl(335 70% 80%)" }}>
+          <div className="text-center mb-4">
+            <div className="text-3xl mb-2">💳</div>
+            <div className="font-oswald font-bold text-lg" style={P2}>Оплати заказ переводом</div>
+            <div className="text-sm mt-1" style={PS2}>Сумма: <strong>{cartTotal.toLocaleString()} ₽</strong></div>
+          </div>
+          {paymentInfo?.payment_phone_sbp && (
+            <div className="rounded-xl p-3 mb-3 text-center" style={{ background: "hsl(142 60% 95%)" }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: "hsl(142 60% 35%)" }}>📱 СБП (Система быстрых платежей)</div>
+              <div className="font-bold text-lg" style={{ color: "hsl(142 60% 30%)" }}>{paymentInfo.payment_phone_sbp}</div>
+              <div className="text-xs mt-0.5" style={{ color: "hsl(142 50% 45%)" }}>
+                {paymentInfo.payment_bank_name || "Банк"} · {paymentInfo.payment_recipient_name || "Получатель"}
+              </div>
+              <button onClick={() => {
+                navigator.clipboard.writeText(paymentInfo?.payment_phone_sbp || "");
+                alert("Номер скопирован!");
+              }} className="mt-2 px-4 py-1.5 rounded-xl text-xs font-medium"
+                style={{ background: "hsl(142 60% 35%)", color: "white" }}>
+                Скопировать номер
+              </button>
+            </div>
+          )}
+          {paymentInfo?.payment_card_number && (
+            <div className="rounded-xl p-3 mb-3 text-center" style={{ background: "hsl(210 80% 96%)" }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: "hsl(210 70% 35%)" }}>💳 Номер карты</div>
+              <div className="font-bold text-lg tracking-widest" style={{ color: "hsl(210 70% 30%)" }}>
+                {paymentInfo.payment_card_number}
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: "hsl(210 50% 45%)" }}>
+                {paymentInfo.payment_bank_name} · {paymentInfo.payment_recipient_name}
+              </div>
+              <button onClick={() => {
+                navigator.clipboard.writeText(paymentInfo?.payment_card_number || "");
+                alert("Номер карты скопирован!");
+              }} className="mt-2 px-4 py-1.5 rounded-xl text-xs font-medium"
+                style={{ background: "hsl(210 70% 40%)", color: "white" }}>
+                Скопировать
+              </button>
+            </div>
+          )}
+          <p className="text-xs text-center mt-2" style={PS2}>
+            После оплаты мы получим уведомление и подтвердим заказ по SMS
+          </p>
+        </div>
+      )}
+
+      <button onClick={() => { setView("catalog"); setPaymentInfo(null); }}
+        className="w-full py-4 rounded-2xl font-bold text-white mb-3" style={GRAD2}>
         Продолжить покупки
       </button>
-      <button onClick={onBack} className="w-full py-3 rounded-2xl font-medium mt-3" style={{ background: "hsl(335 20% 94%)", color: "hsl(335 50% 50%)" }}>
+      <button onClick={onBack} className="w-full py-3 rounded-2xl font-medium"
+        style={{ background: "hsl(335 20% 94%)", color: "hsl(335 50% 50%)" }}>
         На главную
       </button>
     </div>
@@ -5332,6 +5544,32 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
             className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
             style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 28%)" }} />
         </div>
+        {/* Способ оплаты */}
+        <div className="card-glow rounded-2xl p-4">
+          <div className="font-semibold text-sm mb-3" style={P2}>Способ оплаты</div>
+          <div className="space-y-2">
+            <button onClick={() => setPaymentMethod("card")}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+              style={paymentMethod === "card" ? { ...GRAD2, color: "white" } : { background: "hsl(335 20% 96%)", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 30% 88%)" }}>
+              <span className="text-xl">💳</span>
+              <div className="flex-1 text-left">
+                <div className="font-semibold text-sm">Оплата картой / СБП</div>
+                <div className="text-[11px] opacity-80">Переводом на карту</div>
+              </div>
+              {paymentMethod === "card" && <Icon name="Check" size={16} className="ml-auto" />}
+            </button>
+            <button onClick={() => setPaymentMethod("on_delivery")}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+              style={paymentMethod === "on_delivery" ? { ...GRAD2, color: "white" } : { background: "hsl(335 20% 96%)", color: "hsl(335 50% 40%)", border: "1px solid hsl(335 30% 88%)" }}>
+              <span className="text-xl">💵</span>
+              <div className="flex-1 text-left">
+                <div className="font-semibold text-sm">Оплата при получении</div>
+                <div className="text-[11px] opacity-80">Наличными или картой курьеру</div>
+              </div>
+              {paymentMethod === "on_delivery" && <Icon name="Check" size={16} className="ml-auto" />}
+            </button>
+          </div>
+        </div>
         {/* Итого */}
         <div className="card-glow rounded-2xl p-4 flex justify-between items-center">
           <span className="font-semibold text-sm" style={P2}>Итого к оплате</span>
@@ -5341,7 +5579,7 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
         </div>
         <button onClick={placeOrder} disabled={placing}
           className="w-full py-4 rounded-2xl font-bold text-white shadow-lg text-base" style={GRAD2}>
-          {placing ? "Оформляем..." : "✅ Подтвердить заказ"}
+          {placing ? "Оформляем..." : paymentMethod === "card" ? "💳 Оформить и перейти к оплате" : "✅ Подтвердить заказ"}
         </button>
       </div>
     </div>
@@ -5426,6 +5664,30 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
         </button>
       </div>
 
+      {/* Рекламные баннеры */}
+      {banners.length > 0 && (
+        <div className="px-4 mb-4">
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+            {banners.map(b => (
+              <div key={b.id}
+                className="flex-shrink-0 rounded-2xl overflow-hidden relative cursor-pointer"
+                style={{ width: banners.length === 1 ? "100%" : "80vw", maxWidth: 340, height: 120 }}
+                onClick={() => b.link_url && window.open(b.link_url, "_blank")}>
+                {b.image_url
+                  ? <img src={b.image_url} className="w-full h-full object-cover" alt={b.title} />
+                  : <div className="w-full h-full" style={GRAD2} />
+                }
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.4) 0%, transparent 60%)" }} />
+                <div className="absolute bottom-3 left-4 right-4">
+                  {b.title && <div className="font-bold text-sm text-white leading-tight drop-shadow">{b.title}</div>}
+                  {b.subtitle && <div className="text-[11px] text-white/80 mt-0.5 drop-shadow">{b.subtitle}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Категории */}
       {categories.length > 0 && (
         <div className="flex gap-2 px-4 mb-4 overflow-x-auto scrollbar-hide pb-1">
@@ -5449,8 +5711,8 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
       )}
       <div className="px-4 grid grid-cols-2 gap-3">
         {products.map(prod => (
-          <button key={prod.id} onClick={() => setSelectedProduct(prod)}
-            className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
+          <div key={prod.id} onClick={() => setSelectedProduct(prod)}
+            className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all cursor-pointer">
             {prod.photo_url
               ? <img src={prod.photo_url} className="w-full h-36 object-cover" alt={prod.name} />
               : <div className="w-full h-36 flex items-center justify-center text-3xl" style={{ background: "hsl(335 80% 96%)" }}>🛍</div>
@@ -5461,11 +5723,14 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
                 <span className="font-oswald font-bold text-sm" style={{ color: "hsl(335 80% 55%)" }}>
                   {Number(prod.price).toLocaleString()} ₽
                 </span>
-                <button onClick={e => { e.stopPropagation(); addToCart(prod); refreshCart(); }}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-lg font-bold" style={GRAD2}>+</button>
+                <div role="button" tabIndex={0}
+                  onClick={e => { e.stopPropagation(); addToCart(prod); refreshCart(); }}
+                  onKeyDown={e => e.key === "Enter" && (e.stopPropagation(), addToCart(prod), refreshCart())}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-lg font-bold cursor-pointer"
+                  style={GRAD2}>+</div>
               </div>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
@@ -5503,20 +5768,21 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
   );
 }
 
-// ── АДМИН: Магазин (товары + категории + заказы) ──
+// ── АДМИН: Магазин (товары + категории + заказы + реклама) ──
 function AdminShop() {
-  const [tab, setTab] = React.useState<"products" | "categories" | "orders">("products");
+  const [tab, setTab] = React.useState<"products" | "categories" | "orders" | "banners">("products");
   return (
     <div>
       <div className="px-4 mb-4">
-        <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+        <div className="grid grid-cols-4 gap-0.5 rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
           {([
             { id: "products", label: "Товары" },
             { id: "categories", label: "Категории" },
             { id: "orders", label: "Заказы" },
+            { id: "banners", label: "Реклама" },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className="py-2.5 text-xs font-semibold transition-all"
+              className="py-2.5 text-[11px] font-semibold transition-all"
               style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
               {t.label}
             </button>
@@ -5526,6 +5792,7 @@ function AdminShop() {
       {tab === "products" && <AdminShopProducts />}
       {tab === "categories" && <AdminShopCategories />}
       {tab === "orders" && <AdminShopOrders />}
+      {tab === "banners" && <AdminShopBanners />}
     </div>
   );
 }
@@ -5717,7 +5984,20 @@ function AdminShopOrders() {
   const [filter, setFilter] = React.useState("");
   const [expanded, setExpanded] = React.useState<number | null>(null);
 
-  const load = () => adminPost("shop_orders", filter ? { status: filter } : {}).then(d => { setOrders(d.orders || []); setLoading(false); });
+  const prevOrderCount = React.useRef<number>(0);
+  const load = () => adminPost("shop_orders", filter ? { status: filter } : {}).then(d => {
+    const newOrders = d.orders || [];
+    const newCount = newOrders.filter((o: any) => o.status === "new").length;
+    if (newCount > prevOrderCount.current && prevOrderCount.current >= 0) {
+      const diff = newCount - prevOrderCount.current;
+      if (diff > 0) {
+        showPushNotification("Girly Paradise 🛍", `${diff > 1 ? `${diff} новых заказа` : "Новый заказ"} в магазине!`, "new-order");
+        playNotificationSound("bell", 0.5);
+      }
+    }
+    prevOrderCount.current = newCount;
+    setOrders(newOrders); setLoading(false);
+  });
   React.useEffect(() => { load(); }, [filter]);
 
   const STATUS_LABELS: Record<string, string> = { new: "🆕 Новый", confirmed: "✅ Подтверждён", shipped: "🚚 Отправлен", done: "✔ Выдан", cancelled: "❌ Отменён" };
@@ -5782,6 +6062,110 @@ function AdminShopOrders() {
           </div>
         ))}
         {!loading && orders.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Заказов пока нет</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── АДМИН: Рекламные баннеры магазина ──
+function AdminShopBanners() {
+  const [banners, setBanners] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [adding, setAdding] = React.useState(false);
+  const [form, setForm] = React.useState({ title: "", subtitle: "", image_url: "", link_url: "" });
+  const [saving, setSaving] = React.useState(false);
+  const [uploadingBanner, setUploadingBanner] = React.useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const load = () => adminPost("shop_banners").then(d => { setBanners(d.banners || []); setLoading(false); });
+  React.useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.title && !form.image_url) return;
+    setSaving(true);
+    await adminPost("shop_banners", { action: "add", ...form });
+    setForm({ title: "", subtitle: "", image_url: "", link_url: "" });
+    setAdding(false); setSaving(false); load();
+  };
+
+  const toggle = async (id: number) => { await adminPost("shop_banners", { action: "toggle", id }); load(); };
+  const del = async (id: number) => { await adminPost("shop_banners", { action: "delete", id }); load(); };
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-3" style={PS}>Баннеры отображаются вверху магазина</p>
+      {!adding && (
+        <button onClick={() => setAdding(true)} className="w-full py-3 rounded-2xl font-semibold text-white mb-4 text-sm" style={GRAD}>
+          + Добавить баннер
+        </button>
+      )}
+      {adding && (
+        <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Заголовок</label>
+            <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+              placeholder="Скидка 20% на косметику!" autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Подзаголовок</label>
+            <input value={form.subtitle} onChange={e => setForm(p => ({ ...p, subtitle: e.target.value }))}
+              placeholder="Только до конца месяца" autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs block mb-2" style={PS}>Изображение баннера</label>
+            <PhotoUploadButton folder="banners" label="📷 Загрузить изображение" uploading={uploadingBanner}
+              setUploading={setUploadingBanner} onUploaded={url => setForm(p => ({ ...p, image_url: url }))} className="w-full mb-2" />
+            {form.image_url && <img src={form.image_url} className="w-full h-28 object-cover rounded-xl" alt="banner" />}
+          </div>
+          <div>
+            <label className="text-xs block mb-1" style={PS}>Ссылка при нажатии (необязательно)</label>
+            <input value={form.link_url} onChange={e => setForm(p => ({ ...p, link_url: e.target.value }))}
+              placeholder="https://..." autoComplete="off"
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving || uploadingBanner} className="flex-1 py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+              {saving ? "Сохраняем..." : "Добавить"}
+            </button>
+            <button onClick={() => { setAdding(false); setForm({ title: "", subtitle: "", image_url: "", link_url: "" }); }}
+              className="px-4 py-3 rounded-xl text-sm" style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+      {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+      <div className="space-y-3">
+        {banners.map(b => (
+          <div key={b.id} className="card-glow rounded-2xl overflow-hidden" style={!b.is_active ? { opacity: 0.5 } : {}}>
+            {b.image_url && <img src={b.image_url} className="w-full h-28 object-cover" alt={b.title} />}
+            <div className="p-3 flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm" style={P}>{b.title}</div>
+                {b.subtitle && <div className="text-xs" style={PS}>{b.subtitle}</div>}
+                {b.link_url && <div className="text-[10px] truncate mt-0.5" style={{ color: "hsl(335 70% 55%)" }}>{b.link_url}</div>}
+              </div>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button onClick={() => toggle(b.id)} className="px-2.5 py-1 rounded-lg text-xs"
+                  style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                  {b.is_active ? "Скрыть" : "Показать"}
+                </button>
+                <button onClick={() => del(b.id)} className="px-2.5 py-1 rounded-lg text-xs"
+                  style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!loading && banners.length === 0 && (
+          <div className="text-center py-10">
+            <div className="text-4xl mb-3">📢</div>
+            <p className="text-sm" style={PS}>Баннеров пока нет</p>
+          </div>
+        )}
       </div>
     </div>
   );

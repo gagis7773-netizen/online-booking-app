@@ -626,21 +626,29 @@ def handler(event: dict, context) -> dict:
         if body.get("action") == "create":
             items = body.get("items", [])
             total = sum(float(it.get("price",0)) * int(it.get("quantity",1)) for it in items)
+            payment_method = body.get("payment_method", "on_delivery")
             cur.execute(f"""INSERT INTO {SCHEMA}.shop_orders
-                (client_id, client_name, client_phone, delivery_type, delivery_address, pickup_point, total_amount, comment)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (client_id, client_name, client_phone, delivery_type, delivery_address, pickup_point, total_amount, comment, payment_method, payment_status)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                 (body.get("client_id"), body.get("client_name",""), body.get("client_phone",""),
                  body.get("delivery_type","sdek"), body.get("delivery_address",""),
-                 body.get("pickup_point",""), total, body.get("comment","")))
+                 body.get("pickup_point",""), total, body.get("comment",""),
+                 payment_method, "waiting" if payment_method == "card" else "pending"))
             order_id = cur.fetchone()["id"]
             for it in items:
                 cur.execute(f"INSERT INTO {SCHEMA}.shop_order_items (order_id, product_id, product_name, price, quantity) VALUES (%s,%s,%s,%s,%s)",
                             (order_id, it.get("product_id"), it.get("name",""), float(it.get("price",0)), int(it.get("quantity",1))))
             conn.commit()
             phone = body.get("client_phone","")
-            if phone: send_sms(phone, f"Girly Paradise: ваш заказ №{order_id} оформлен! Сумма: {total:.0f} ₽. Свяжемся с вами. 🌸")
-            send_sms("79046015556", f"Girly Paradise: новый заказ №{order_id} от {body.get('client_name','')}! {total:.0f} ₽. {body.get('delivery_type','')}: {body.get('pickup_point','')}")
-            conn.close(); return resp({"ok": True, "order_id": order_id, "total": total})
+            pay_note = "Оплата при получении" if payment_method == "on_delivery" else "Оплата картой/СБП"
+            if phone: send_sms(phone, f"Girly Paradise: заказ №{order_id} оформлен! Сумма: {total:.0f} ₽. {pay_note}. Свяжемся с вами. 🌸")
+            send_sms("79046015556", f"Girly Paradise: новый заказ №{order_id} от {body.get('client_name','')}! {total:.0f} ₽. {pay_note}. {body.get('delivery_type','')}: {body.get('pickup_point','')}")
+            # Возвращаем реквизиты оплаты если выбрана карта
+            payment_info = {}
+            if payment_method == "card":
+                cur.execute(f"SELECT key, value FROM {SCHEMA}.site_settings WHERE key IN ('payment_card_number','payment_phone_sbp','payment_bank_name','payment_recipient_name')")
+                payment_info = {r["key"]: r["value"] for r in cur.fetchall()}
+            conn.close(); return resp({"ok": True, "order_id": order_id, "total": total, "payment_info": payment_info})
         if body.get("action") == "update_status":
             cur.execute(f"UPDATE {SCHEMA}.shop_orders SET status=%s WHERE id=%s", (body.get("status"), body.get("id")))
             conn.commit(); conn.close(); return resp({"ok": True})
@@ -654,6 +662,48 @@ def handler(event: dict, context) -> dict:
             cur.execute(f"SELECT * FROM {SCHEMA}.shop_order_items WHERE order_id=%s", (o["id"],))
             o["items"] = [dict(r) for r in cur.fetchall()]
         conn.close(); return resp({"orders": orders})
+
+    # ── СЧЁТЧИКИ БЕЙДЖЕЙ (сообщения + заказы) ──
+    if section == "badge_counts":
+        # Непрочитанные сообщения (чаты без ответа от клиентов за последние 24ч)
+        try:
+            cur.execute(f"""
+                SELECT COUNT(DISTINCT c.id) as unread_msgs
+                FROM {SCHEMA}.chats c
+                JOIN {SCHEMA}.messages m ON m.chat_id = c.id
+                WHERE m.sender = 'client'
+                  AND (c.admin_read_at IS NULL OR m.created_at > c.admin_read_at)
+                  AND m.created_at > NOW() - INTERVAL '7 days'
+            """)
+            unread_msgs = int(cur.fetchone()["unread_msgs"] or 0)
+        except Exception:
+            unread_msgs = 0
+        # Новые заказы
+        try:
+            cur.execute(f"SELECT COUNT(*) as cnt FROM {SCHEMA}.shop_orders WHERE status='new'")
+            new_orders = int(cur.fetchone()["cnt"] or 0)
+        except Exception:
+            new_orders = 0
+        conn.close(); return resp({"unread_msgs": unread_msgs, "new_orders": new_orders})
+
+    # ── БАННЕРЫ/РЕКЛАМА МАГАЗИНА ──
+    if section == "shop_banners":
+        if body.get("action") == "add":
+            cur.execute(f"""INSERT INTO {SCHEMA}.shop_banners (title, subtitle, image_url, link_url, sort_order)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                (body.get("title",""), body.get("subtitle",""), body.get("image_url",""),
+                 body.get("link_url",""), int(body.get("sort_order",0))))
+            row_id = cur.fetchone()["id"]; conn.commit(); conn.close(); return resp({"ok": True, "id": row_id})
+        if body.get("action") == "toggle":
+            cur.execute(f"UPDATE {SCHEMA}.shop_banners SET is_active = NOT is_active WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "delete":
+            cur.execute(f"DELETE FROM {SCHEMA}.shop_banners WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        active_only = body.get("active_only", False)
+        q = f"SELECT * FROM {SCHEMA}.shop_banners" + (" WHERE is_active=true" if active_only else "") + " ORDER BY sort_order, id"
+        cur.execute(q); rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"banners": rows})
 
     conn.close()
     return resp({"error": "Unknown section"}, 400)
