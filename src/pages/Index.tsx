@@ -191,11 +191,12 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
               <Icon name="Phone" size={11} />
               <span>+7 (904) 601-55-56</span>
             </a>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+            <a href="https://yandex.ru/maps/?text=Санкт-Петербург+ул+Заречная+10" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
               style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 60% 50%)", border: "1px solid hsl(335 50% 85%)" }}>
               <Icon name="MapPin" size={11} />
-              <span>м. Парнас · ул. Заречная, 10</span>
-            </div>
+              <span>м. Парнас · ул. Заречная, 10 →</span>
+            </a>
           </div>
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -282,6 +283,21 @@ function HomePage({ setPage, startBooking, client }: { setPage: (p: Page) => voi
 
 // ─── ПРАЙС-ЛИСТ ─────────────────────────────────────────────────────────────
 
+// Выносим поиск в отдельный стабильный компонент чтобы клавиатура не исчезала
+const PriceSearchInput = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+  <div className="relative mb-3">
+    <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
+    <input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder="Поиск услуги..."
+      autoComplete="off"
+      className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+      style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }}
+    />
+  </div>
+);
+
 function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; startBooking: () => void }) {
   const [priceItems, setPriceItems] = useState<any[]>([]);
   const [priceLoaded, setPriceLoaded] = useState(false);
@@ -289,7 +305,6 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    // Сначала пробуем кастомный прайс из БД
     adminPost("pricelist_custom", { active_only: true })
       .then(d => {
         if (d.items && d.items.length > 0) {
@@ -302,7 +317,6 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
           })));
           setPriceLoaded(true);
         } else {
-          // Фолбэк на старый API
           return fetch("https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941/pricelist")
             .then(r => r.json())
             .then(d2 => { setPriceItems(d2.services || []); setPriceLoaded(true); });
@@ -336,12 +350,7 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
       </div>
 
       <div className="px-4 pb-3">
-        <div className="relative mb-3">
-          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
-          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Поиск услуги..."
-            className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
-            style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
-        </div>
+        <PriceSearchInput value={searchQuery} onChange={setSearchQuery} />
 
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
           {cats.map((cat) => (
@@ -405,8 +414,18 @@ function PriceListPage({ setPage, startBooking }: { setPage: (p: Page) => void; 
 type Master = { id: number; name: string; spec: string; rating: number; reviews: number; img: string; tags: string[] };
 
 function MastersPage({ masters: mList, setPage, startBooking }: { masters: Master[]; setPage: (p: Page) => void; startBooking: () => void }) {
+  const [fullscreenImg, setFullscreenImg] = useState<string | null>(null);
+
   return (
     <div className="animate-fade-in">
+      {/* Полноэкранный просмотр */}
+      {fullscreenImg && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={() => setFullscreenImg(null)}>
+          <img src={fullscreenImg} className="max-w-full max-h-full object-contain" alt="мастер" />
+          <button className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-xl font-bold">✕</button>
+        </div>
+      )}
+
       <div className="px-4 pt-12 pb-6">
         <h1 className="text-3xl font-oswald font-bold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Мастера 🌸</h1>
         <p className="text-sm" style={{ color: "hsl(335 30% 55%)" }}>Профессионалы своего дела</p>
@@ -414,9 +433,14 @@ function MastersPage({ masters: mList, setPage, startBooking }: { masters: Maste
       <div className="px-4 space-y-4">
         {mList.map((m, i) => (
           <div key={m.id} className="card-glow rounded-3xl overflow-hidden animate-slide-up" style={{ animationDelay: `${i * 0.1}s` }}>
-            <div className="relative h-56 overflow-hidden">
+            <div className="relative h-56 overflow-hidden cursor-pointer" onClick={() => setFullscreenImg(m.img)}>
               <img src={m.img} alt={m.name} className="w-full h-full object-cover" />
               <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(255,220,230,0.1) 0%, rgba(255,240,245,0.92) 100%)" }} />
+              {/* Подсказка */}
+              <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs flex items-center gap-1"
+                style={{ background: "rgba(255,255,255,0.85)", color: "hsl(335 60% 40%)" }}>
+                <Icon name="ZoomIn" size={11} /> увеличить
+              </div>
               <div className="absolute bottom-0 left-0 right-0 p-4">
                 <div className="flex items-end justify-between">
                   <div>
@@ -920,13 +944,17 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [tab, setTab] = useState<"upcoming" | "done">("upcoming");
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [installed, setInstalled] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string>(localStorage.getItem("gp_avatar_" + client.id) || "");
+  const [showShare, setShowShare] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSent, setReviewSent] = useState(false);
+  const siteUrl = window.location.href;
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("gp_bookings_" + client.id) || "[]");
     setBookings(stored);
     setLoadingHistory(false);
-
     const handler = (e: any) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -934,37 +962,86 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
   const filtered = bookings.filter((b: any) => b.status === tab);
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: "Girly Paradise", text: "Запишись на косметологические процедуры онлайн!", url: window.location.href });
-    } else {
-      await navigator.clipboard.writeText(window.location.href);
-      alert("Ссылка скопирована!");
-    }
+  // Загрузка фото из галереи телефона
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      setAvatarUrl(url);
+      localStorage.setItem("gp_avatar_" + client.id, url);
+    };
+    reader.readAsDataURL(file);
   };
 
+  // Поделиться — показываем выбор мессенджеров
+  const shareLinks = [
+    { label: "WhatsApp", emoji: "💚", url: `https://wa.me/?text=${encodeURIComponent("Записывайся на косметологические процедуры в Girly Paradise! " + siteUrl)}` },
+    { label: "Telegram", emoji: "✈️", url: `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent("Girly Paradise Beauty Apartments — запись онлайн!")}` },
+    { label: "ВКонтакте", emoji: "🔵", url: `https://vk.com/share.php?url=${encodeURIComponent(siteUrl)}&title=${encodeURIComponent("Girly Paradise")}` },
+    { label: "Скопировать", emoji: "📋", url: "" },
+  ];
+
+  const handleShareLink = async (link: typeof shareLinks[0]) => {
+    if (!link.url) {
+      await navigator.clipboard.writeText(siteUrl);
+      alert("Ссылка скопирована!");
+    } else {
+      window.open(link.url, "_blank");
+    }
+    setShowShare(false);
+  };
+
+  // Добавить на экран
   const handleInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === "accepted") setInstalled(true);
-      setDeferredPrompt(null);
+      if (outcome === "accepted") setDeferredPrompt(null);
     } else {
-      alert("Чтобы добавить на экран: нажми «Поделиться» → «На экран Домой» (iOS) или меню браузера → «Установить»");
+      // iOS инструкция
+      const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        alert("Для добавления на экран:\n1. Нажми кнопку «Поделиться» (□↑) в Safari\n2. Выбери «На экран Домой»");
+      } else {
+        alert("Нажми меню браузера (⋮) → «Установить приложение» или «Добавить на главный экран»");
+      }
     }
+  };
+
+  const handleSendReview = async () => {
+    if (!reviewText.trim()) return;
+    // Отправляем в чат как сообщение с отзывом
+    await adminPost("broadcast", { message: `⭐ Отзыв от ${client.name} (${client.phone}): ${reviewText}`, channels: ["chat"] });
+    setReviewSent(true);
+    setTimeout(() => { setShowReview(false); setReviewText(""); setReviewSent(false); }, 2000);
   };
 
   return (
     <div className="animate-fade-in">
       <div className="px-4 pt-12 pb-4">
+        {/* Аватар + имя */}
         <div className="flex items-center gap-4 mb-5">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md"
-            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
-            🌸
+          <div className="relative">
+            <label className="cursor-pointer">
+              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-2xl font-bold text-white shadow-md"
+                style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                  : "🌸"}
+              </div>
+              <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: "hsl(335 80% 58%)", border: "2px solid white" }}>
+                <Icon name="Camera" size={10} className="text-white" />
+              </div>
+            </label>
           </div>
           <div className="flex-1">
             <h2 className="text-xl font-oswald font-bold" style={{ color: "hsl(335 60% 30%)" }}>{client.name}</h2>
-            <p className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>{client.phone}</p>
+            <p className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{client.phone}</p>
+            <p className="text-xs mt-0.5" style={{ color: "hsl(335 50% 65%)" }}>Нажми на фото чтобы изменить</p>
           </div>
           <button onClick={onLogout} className="px-3 py-2 rounded-xl text-xs font-medium"
             style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
@@ -986,38 +1063,71 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
           </button>
         </div>
 
-        {/* Кнопки Share / Install */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <button onClick={handleShare}
-            className="py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
+        {/* Кнопки Share / Install / Отзыв */}
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          <button onClick={() => setShowShare(!showShare)}
+            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
-            <Icon name="Share2" size={15} />
+            <Icon name="Share2" size={16} />
             Поделиться
           </button>
           <button onClick={handleInstall}
-            className="py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
+            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
-            <Icon name="Smartphone" size={15} />
-            {installed ? "Установлено ✓" : "На экран"}
+            <Icon name="Smartphone" size={16} />
+            На экран
+          </button>
+          <button onClick={() => setShowReview(!showReview)}
+            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
+            style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+            <Icon name="Star" size={16} />
+            Отзыв
           </button>
         </div>
+
+        {/* Поделиться — выбор мессенджера */}
+        {showShare && (
+          <div className="card-glow rounded-2xl p-4 mb-4 animate-slide-up">
+            <p className="text-xs font-medium mb-3" style={{ color: "hsl(335 40% 55%)" }}>Поделиться через:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {shareLinks.map(link => (
+                <button key={link.label} onClick={() => handleShareLink(link)}
+                  className="flex items-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium"
+                  style={{ background: "hsl(335 80% 98%)", color: "hsl(335 60% 35%)", border: "1px solid hsl(335 50% 88%)" }}>
+                  <span className="text-lg">{link.emoji}</span>
+                  {link.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Форма отзыва */}
+        {showReview && (
+          <div className="card-glow rounded-2xl p-4 mb-4 animate-slide-up">
+            <p className="text-xs font-medium mb-2" style={{ color: "hsl(335 40% 55%)" }}>Ваш отзыв:</p>
+            <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} rows={3}
+              placeholder="Расскажите о вашем визите..."
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none mb-3"
+              style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+            <button onClick={handleSendReview} disabled={!reviewText.trim()}
+              className="w-full py-3 rounded-xl font-semibold text-white text-sm"
+              style={reviewText.trim() ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" } : { background: "hsl(335 20% 90%)", color: "hsl(335 20% 65%)" }}>
+              {reviewSent ? "Спасибо! ✓" : "Отправить отзыв"}
+            </button>
+          </div>
+        )}
 
         {/* История посещений */}
         <h3 className="text-lg font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>История посещений</h3>
 
         <div className="flex rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
-          <button onClick={() => setTab("upcoming")}
-            className="flex-1 py-2.5 text-sm font-medium transition-all"
-            style={tab === "upcoming"
-              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
-              : { color: "hsl(335 40% 60%)" }}>
+          <button onClick={() => setTab("upcoming")} className="flex-1 py-2.5 text-sm font-medium transition-all"
+            style={tab === "upcoming" ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" } : { color: "hsl(335 40% 60%)" }}>
             Предстоящие
           </button>
-          <button onClick={() => setTab("done")}
-            className="flex-1 py-2.5 text-sm font-medium transition-all"
-            style={tab === "done"
-              ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" }
-              : { color: "hsl(335 40% 60%)" }}>
+          <button onClick={() => setTab("done")} className="flex-1 py-2.5 text-sm font-medium transition-all"
+            style={tab === "done" ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" } : { color: "hsl(335 40% 60%)" }}>
             Были у нас
           </button>
         </div>
@@ -1070,7 +1180,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1103,9 +1213,10 @@ function AdminPage({ onBack }: { onBack: () => void }) {
   const menuItems: { id: AdminSection; icon: string; label: string; color: string; ownerOnly?: boolean }[] = [
     { id: "schedule", icon: "CalendarDays", label: "Расписание", color: "from-blue-500 to-indigo-500" },
     { id: "clients", icon: "Users", label: "Клиенты", color: "from-purple-500 to-pink-500" },
+    { id: "analytics", icon: "BarChart3", label: "Статистика", color: "from-pink-500 to-fuchsia-500", ownerOnly: true },
     { id: "messages", icon: "MessageCircle", label: "Сообщения", color: "from-teal-500 to-cyan-500" },
     { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500", ownerOnly: true },
-    { id: "expenses", icon: "Wallet", label: "Расходы", color: "from-red-500 to-orange-500", ownerOnly: true },
+    { id: "expenses", icon: "Wallet", label: "Финансы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
     { id: "broadcast", icon: "Send", label: "Рассылка", color: "from-sky-500 to-blue-500", ownerOnly: true },
@@ -1136,61 +1247,24 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
+          {/* Краткая сводка на главной */}
           {isOwner && stats && (
-            <>
-              {/* Блок финансов */}
-              <h2 className="text-sm font-oswald font-semibold mb-2 uppercase tracking-wider" style={PS}>Финансы</h2>
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {[
-                  { label: "Расходы/нед", val: `${(stats.expenses_week||0).toLocaleString()} ₽`, icon: "TrendingDown", color: "from-red-400 to-orange-400" },
-                  { label: "Расходы/мес", val: `${(stats.expenses_month||0).toLocaleString()} ₽`, icon: "Wallet", color: "from-orange-400 to-amber-400" },
-                  { label: "Расходы итог", val: `${(stats.expenses_total||0).toLocaleString()} ₽`, icon: "PiggyBank", color: "from-pink-400 to-rose-400" },
-                ].map(item => (
-                  <div key={item.label} className="card-glow rounded-2xl p-3">
-                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
-                      <Icon name={item.icon as any} size={14} className="text-white" />
-                    </div>
-                    <div className="text-base font-oswald font-bold leading-tight" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
-                    <div className="text-[10px] leading-tight mt-0.5" style={PS}>{item.label}</div>
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              {[
+                { label: "Клиентов", val: stats.clients_total, icon: "Users", color: "from-purple-500 to-pink-500" },
+                { label: "Записей", val: stats.bookings_total, icon: "CalendarCheck", color: "from-blue-500 to-indigo-500" },
+                { label: "В расп.", val: stats.schedule_total, icon: "Clock", color: "from-teal-500 to-cyan-500" },
+              ].map(item => (
+                <button key={item.label} onClick={() => setSection("analytics")}
+                  className="card-glow rounded-2xl p-3 text-left hover:scale-105 transition-all">
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                    <Icon name={item.icon as any} size={14} className="text-white" />
                   </div>
-                ))}
-              </div>
-
-              {/* Блок клиентов */}
-              <h2 className="text-sm font-oswald font-semibold mb-2 uppercase tracking-wider" style={PS}>Клиенты</h2>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {[
-                  { label: "Всего клиентов", val: stats.clients_total, icon: "Users", color: "from-purple-500 to-pink-500" },
-                  { label: "Новых за месяц", val: `+${stats.clients_month}`, icon: "UserPlus", color: "from-fuchsia-500 to-purple-500" },
-                ].map(item => (
-                  <div key={item.label} className="card-glow rounded-2xl p-4">
-                    <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
-                      <Icon name={item.icon as any} size={16} className="text-white" />
-                    </div>
-                    <div className="text-2xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
-                    <div className="text-xs" style={PS}>{item.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Блок записей */}
-              <h2 className="text-sm font-oswald font-semibold mb-2 uppercase tracking-wider" style={PS}>Записи</h2>
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                {[
-                  { label: "Всего записей", val: stats.bookings_total, icon: "CalendarCheck", color: "from-blue-500 to-indigo-500" },
-                  { label: "За месяц", val: stats.bookings_month, icon: "TrendingUp", color: "from-cyan-500 to-blue-500" },
-                  { label: "В расписании", val: stats.schedule_total, icon: "Clock", color: "from-teal-500 to-cyan-500" },
-                ].map(item => (
-                  <div key={item.label} className="card-glow rounded-2xl p-3">
-                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
-                      <Icon name={item.icon as any} size={14} className="text-white" />
-                    </div>
-                    <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
-                    <div className="text-[10px] leading-tight" style={PS}>{item.label}</div>
-                  </div>
-                ))}
-              </div>
-            </>
+                  <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+                  <div className="text-[10px] leading-tight" style={PS}>{item.label}</div>
+                </button>
+              ))}
+            </div>
           )}
           {!isOwner && (
             <div className="card-glow rounded-2xl p-5 mb-5 text-center">
@@ -1199,7 +1273,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
               <p className="text-xs mt-1" style={PS}>Используй меню ниже для работы с записями</p>
             </div>
           )}
-          {!stats && isOwner && <div className="text-center py-6"><div className="text-3xl animate-float">🌸</div></div>}
+          {!stats && isOwner && <div className="text-center py-4"><div className="text-3xl animate-float">🌸</div></div>}
 
           <h2 className="text-base font-oswald font-semibold mb-3" style={P}>Разделы</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -1218,6 +1292,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "clients" && <AdminClients />}
       {section === "schedule" && <AdminSchedule />}
+      {section === "analytics" && isOwner && <AdminAnalytics />}
       {section === "messages" && <AdminMessages />}
       {section === "notifications" && isOwner && <AdminNotifications />}
       {section === "expenses" && isOwner && <AdminExpenses />}
@@ -1227,6 +1302,140 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
       {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
+    </div>
+  );
+}
+
+// ── Статистика (отдельный раздел) ──
+function AdminAnalytics() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const MONTH_NAMES = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+
+  useEffect(() => {
+    Promise.all([
+      adminPost("stats"),
+      adminPost("monthly_finance"),
+    ]).then(([s, mf]) => {
+      setStats({ ...s, months: mf.months || [] });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="text-center py-16"><div className="text-4xl animate-float">🌸</div></div>;
+  if (!stats) return null;
+
+  const maxIncome = Math.max(...(stats.months || []).map((m: any) => Number(m.total_income) || 0), 1);
+
+  return (
+    <div className="px-4 pb-6 space-y-5">
+      {/* Записи */}
+      <div>
+        <h2 className="text-sm font-oswald font-semibold mb-3 uppercase tracking-wider" style={PS}>📅 Записи</h2>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Всего", val: stats.bookings_total, icon: "CalendarCheck", color: "from-blue-500 to-indigo-500" },
+            { label: "За месяц", val: stats.bookings_month, icon: "TrendingUp", color: "from-cyan-500 to-blue-500" },
+            { label: "В расписании", val: stats.schedule_total, icon: "Clock", color: "from-teal-500 to-cyan-500" },
+          ].map(item => (
+            <div key={item.label} className="card-glow rounded-2xl p-3">
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                <Icon name={item.icon as any} size={14} className="text-white" />
+              </div>
+              <div className="text-xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+              <div className="text-[10px]" style={PS}>{item.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Клиенты */}
+      <div>
+        <h2 className="text-sm font-oswald font-semibold mb-3 uppercase tracking-wider" style={PS}>👥 Клиенты</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "Всего клиентов", val: stats.clients_total, icon: "Users", color: "from-purple-500 to-pink-500" },
+            { label: "Новых за месяц", val: `+${stats.clients_month}`, icon: "UserPlus", color: "from-fuchsia-500 to-purple-500" },
+          ].map(item => (
+            <div key={item.label} className="card-glow rounded-2xl p-4">
+              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                <Icon name={item.icon as any} size={16} className="text-white" />
+              </div>
+              <div className="text-2xl font-oswald font-bold" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+              <div className="text-xs" style={PS}>{item.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Финансы */}
+      <div>
+        <h2 className="text-sm font-oswald font-semibold mb-3 uppercase tracking-wider" style={PS}>💰 Финансы</h2>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {[
+            { label: "Расх/нед", val: `${(stats.expenses_week||0).toLocaleString()} ₽`, icon: "TrendingDown", color: "from-red-400 to-orange-400" },
+            { label: "Расх/мес", val: `${(stats.expenses_month||0).toLocaleString()} ₽`, icon: "Wallet", color: "from-orange-400 to-amber-400" },
+            { label: "Расх итог", val: `${(stats.expenses_total||0).toLocaleString()} ₽`, icon: "PiggyBank", color: "from-pink-400 to-rose-400" },
+          ].map(item => (
+            <div key={item.label} className="card-glow rounded-2xl p-3">
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-2`}>
+                <Icon name={item.icon as any} size={14} className="text-white" />
+              </div>
+              <div className="text-sm font-oswald font-bold leading-tight" style={{ color: "hsl(335 80% 55%)" }}>{item.val}</div>
+              <div className="text-[10px]" style={PS}>{item.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Доходы по месяцам — мини-бар-чарт */}
+      {stats.months && stats.months.length > 0 && (
+        <div>
+          <h2 className="text-sm font-oswald font-semibold mb-3 uppercase tracking-wider" style={PS}>📊 Доходы по месяцам</h2>
+          <div className="card-glow rounded-2xl p-4">
+            <div className="flex items-end gap-1.5 h-28">
+              {[...stats.months].reverse().slice(0, 6).reverse().map((m: any) => {
+                const income = Number(m.total_income) || 0;
+                const expenses = Number(m.total_expenses) || 0;
+                const h = Math.round((income / maxIncome) * 100);
+                return (
+                  <div key={`${m.year}-${m.month}`} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="text-[9px] font-bold" style={{ color: income >= expenses ? "hsl(142 60% 40%)" : "hsl(0 60% 50%)" }}>
+                      {income > 0 ? `${Math.round(income/1000)}к` : ""}
+                    </div>
+                    <div className="w-full rounded-t-lg transition-all" style={{ height: `${Math.max(h, 4)}%`, background: income >= expenses ? "hsl(142 60% 50%)" : "hsl(0 60% 55%)" }} />
+                    <div className="text-[9px]" style={PS}>{MONTH_NAMES[m.month]}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-3 mt-3 text-xs" style={PS}>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Доход</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Расход &gt; Дохода</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Динамика клиентов */}
+      {stats.clients_chart && stats.clients_chart.length > 0 && (
+        <div>
+          <h2 className="text-sm font-oswald font-semibold mb-3 uppercase tracking-wider" style={PS}>📈 Новые клиенты</h2>
+          <div className="card-glow rounded-2xl p-4">
+            <div className="space-y-2">
+              {stats.clients_chart.map((c: any) => (
+                <div key={c.mon} className="flex items-center gap-3">
+                  <span className="text-xs w-8 text-right" style={PS}>{c.mon}</span>
+                  <div className="flex-1 h-5 rounded-full overflow-hidden" style={{ background: "hsl(335 30% 93%)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(100, (c.cnt / Math.max(...stats.clients_chart.map((x: any) => x.cnt), 1)) * 100)}%`, background: "linear-gradient(90deg, hsl(335 80% 60%), hsl(315 70% 65%))" }} />
+                  </div>
+                  <span className="text-xs font-bold w-6" style={{ color: "hsl(335 80% 55%)" }}>{c.cnt}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2150,6 +2359,7 @@ function AdminBroadcast() {
     { id: "sms", label: "SMS", emoji: "📱" },
     { id: "whatsapp", label: "WhatsApp", emoji: "💚" },
     { id: "telegram", label: "Telegram", emoji: "✈️" },
+    { id: "max", label: "MAX", emoji: "🟣" },
     { id: "chat", label: "Чат сайта", emoji: "💬" },
   ];
 
@@ -2162,6 +2372,7 @@ function AdminBroadcast() {
     const links: { label: string; url: string; emoji: string }[] = [];
     if (chs.includes("whatsapp")) links.push({ label: "WhatsApp", url: `https://wa.me/${p}?text=${enc}`, emoji: "💚" });
     if (chs.includes("telegram")) links.push({ label: "Telegram", url: `https://t.me/+${p}`, emoji: "✈️" });
+    if (chs.includes("max")) links.push({ label: "MAX", url: `https://max.ru/send?phone=${p}&text=${enc}`, emoji: "🟣" });
     return links;
   };
 
@@ -2850,7 +3061,7 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
     { id: "home", icon: "Home", label: "Главная" },
     { id: "gallery", icon: "Images", label: "Галерея" },
     { id: "booking", icon: "CalendarPlus", label: "Записаться" },
-    { id: "chat", icon: "MessageCircle", label: "Чат" },
+    { id: "reviews", icon: "Star", label: "Отзывы" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
 
