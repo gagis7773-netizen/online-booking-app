@@ -5871,6 +5871,9 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
   const [categories, setCategories] = React.useState<any[]>([]);
   const [products, setProducts] = React.useState<any[]>([]);
   const [banners, setBanners] = React.useState<any[]>([]);
+  const [bannerIdx, setBannerIdx] = React.useState(0);
+  const [fullscreenBanner, setFullscreenBanner] = React.useState<any | null>(null);
+  const bannerTimer = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [activeCat, setActiveCat] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [cart, setCart] = React.useState<any[]>(getCart());
@@ -5896,6 +5899,15 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
     });
     adminPost("shop_banners", { active_only: true }).then(d => setBanners(d.banners || []));
   }, []);
+
+  // Автослайдер баннеров — каждые 3.5 сек
+  React.useEffect(() => {
+    if (banners.length <= 1) return;
+    bannerTimer.current = setInterval(() => {
+      setBannerIdx(i => (i + 1) % banners.length);
+    }, 3500);
+    return () => { if (bannerTimer.current) clearInterval(bannerTimer.current); };
+  }, [banners.length]);
 
   React.useEffect(() => {
     if (activeCat === null) return;
@@ -6177,27 +6189,103 @@ function ShopPage({ client, onBack }: { client: any; onBack: () => void }) {
         </button>
       </div>
 
-      {/* Рекламные баннеры */}
+      {/* Рекламные баннеры — слайдер */}
       {banners.length > 0 && (
         <div className="px-4 mb-4">
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-            {banners.map(b => (
+          {/* Слайдер */}
+          <div className="relative rounded-2xl overflow-hidden" style={{ height: 160 }}>
+            {banners.map((b, i) => (
               <div key={b.id}
-                className="flex-shrink-0 rounded-2xl overflow-hidden relative cursor-pointer"
-                style={{ width: banners.length === 1 ? "100%" : "80vw", maxWidth: 340, height: 120 }}
-                onClick={() => b.link_url && window.open(b.link_url, "_blank")}>
+                className="absolute inset-0 transition-opacity duration-700 cursor-pointer"
+                style={{ opacity: i === bannerIdx ? 1 : 0, pointerEvents: i === bannerIdx ? "auto" : "none" }}
+                onClick={() => setFullscreenBanner(b)}>
                 {b.image_url
                   ? <img src={b.image_url} className="w-full h-full object-cover" alt={b.title} />
                   : <div className="w-full h-full" style={GRAD2} />
                 }
-                <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.4) 0%, transparent 60%)" }} />
-                <div className="absolute bottom-3 left-4 right-4">
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 55%)" }} />
+                <div className="absolute bottom-3 left-4 right-12">
                   {b.title && <div className="font-bold text-sm text-white leading-tight drop-shadow">{b.title}</div>}
-                  {b.subtitle && <div className="text-[11px] text-white/80 mt-0.5 drop-shadow">{b.subtitle}</div>}
+                  {b.subtitle && <div className="text-[11px] text-white/75 mt-0.5 drop-shadow">{b.subtitle}</div>}
+                </div>
+                {/* Иконка увеличения */}
+                <div className="absolute bottom-3 right-3 w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(4px)" }}>
+                  <Icon name="Maximize2" size={13} className="text-white" />
                 </div>
               </div>
             ))}
+
+            {/* Стрелки (если баннеров больше 1) */}
+            {banners.length > 1 && (
+              <>
+                <button
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center z-10"
+                  style={{ background: "rgba(0,0,0,0.30)", backdropFilter: "blur(4px)" }}
+                  onClick={() => { setBannerIdx(i => (i - 1 + banners.length) % banners.length); if (bannerTimer.current) { clearInterval(bannerTimer.current); bannerTimer.current = setInterval(() => setBannerIdx(i => (i + 1) % banners.length), 3500); } }}>
+                  <Icon name="ChevronLeft" size={15} className="text-white" />
+                </button>
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center z-10"
+                  style={{ background: "rgba(0,0,0,0.30)", backdropFilter: "blur(4px)" }}
+                  onClick={() => { setBannerIdx(i => (i + 1) % banners.length); if (bannerTimer.current) { clearInterval(bannerTimer.current); bannerTimer.current = setInterval(() => setBannerIdx(i => (i + 1) % banners.length), 3500); } }}>
+                  <Icon name="ChevronRight" size={15} className="text-white" />
+                </button>
+              </>
+            )}
           </div>
+
+          {/* Точки-индикаторы */}
+          {banners.length > 1 && (
+            <div className="flex justify-center gap-1.5 mt-2">
+              {banners.map((_, i) => (
+                <button key={i} onClick={() => setBannerIdx(i)}
+                  className="rounded-full transition-all duration-300"
+                  style={{
+                    width: i === bannerIdx ? 20 : 6,
+                    height: 6,
+                    background: i === bannerIdx ? "hsl(335 80% 58%)" : "hsl(335 40% 82%)"
+                  }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Полноэкранный просмотр баннера */}
+      {fullscreenBanner && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+          onClick={() => setFullscreenBanner(null)}>
+          {fullscreenBanner.image_url
+            ? <img src={fullscreenBanner.image_url} className="w-full h-full object-contain" alt={fullscreenBanner.title} />
+            : <div className="w-full h-full" style={GRAD2} />
+          }
+          {/* Текст поверх */}
+          {(fullscreenBanner.title || fullscreenBanner.subtitle) && (
+            <div className="absolute bottom-16 left-0 right-0 px-6 text-center"
+              onClick={e => e.stopPropagation()}>
+              {fullscreenBanner.title && (
+                <div className="font-oswald font-bold text-2xl text-white mb-2 drop-shadow-lg">{fullscreenBanner.title}</div>
+              )}
+              {fullscreenBanner.subtitle && (
+                <div className="text-white/85 text-sm drop-shadow">{fullscreenBanner.subtitle}</div>
+              )}
+              {fullscreenBanner.link_url && (
+                <a href={fullscreenBanner.link_url} target="_blank" rel="noopener noreferrer"
+                  className="mt-4 inline-block px-6 py-3 rounded-2xl font-semibold text-white text-sm"
+                  style={{ background: "hsl(335 80% 55%)" }}
+                  onClick={e => e.stopPropagation()}>
+                  Перейти →
+                </a>
+              )}
+            </div>
+          )}
+          {/* Кнопка закрыть */}
+          <button className="absolute top-10 right-4 w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)" }}
+            onClick={() => setFullscreenBanner(null)}>
+            <Icon name="X" size={20} className="text-white" />
+          </button>
         </div>
       )}
 
