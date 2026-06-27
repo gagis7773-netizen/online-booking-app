@@ -401,20 +401,24 @@ function PhotoUploadButton({
 
 type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery" | "documents" | "shop";
 
-const services = [
-  { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
-  { id: 2, name: "Вакуумный массаж", category: "Тело", price: 0, duration: 60, icon: "Wind", color: "from-teal-500 to-cyan-600" },
-  { id: 3, name: "СМАС-лифтинг", category: "Лицо", price: 0, duration: 90, icon: "Zap", color: "from-yellow-500 to-orange-500" },
-  { id: 4, name: "Биоревитализация и мезо без иглы", category: "Лицо", price: 0, duration: 60, icon: "Droplets", color: "from-blue-500 to-indigo-600" },
-  { id: 5, name: "Микроигольчатый РФ-лифтинг", category: "Лицо", price: 0, duration: 60, icon: "Sparkles", color: "from-fuchsia-500 to-pink-600" },
-  { id: 6, name: "Увеличение губ без иглы", category: "Лицо", price: 0, duration: 45, icon: "Heart", color: "from-rose-500 to-pink-600" },
-  { id: 7, name: "Уходовые процедуры по лицу", category: "Лицо", price: 0, duration: 60, icon: "Star", color: "from-pink-500 to-rose-600" },
-  { id: 8, name: "СПА-программы", category: "Тело", price: 0, duration: 90, icon: "Flower2", color: "from-purple-500 to-pink-600" },
-  { id: 9, name: "Микронидлинг", category: "Лицо", price: 0, duration: 60, icon: "CircleDot", color: "from-indigo-500 to-purple-600" },
-  { id: 10, name: "Липолитики", category: "Тело", price: 0, duration: 45, icon: "Flame", color: "from-orange-500 to-red-600" },
-  { id: 11, name: "Волосы", category: "Волосы", price: 0, duration: 60, icon: "Scissors", color: "from-amber-500 to-yellow-600" },
-  { id: 12, name: "РФ-лифтинг тело и лицо", category: "Лицо", price: 0, duration: 60, icon: "Waves", color: "from-violet-500 to-purple-600" },
-];
+// Иконки и цвета по категории для услуг в записи
+const CAT_STYLE: Record<string, { icon: string; color: string }> = {
+  "Лицо":        { icon: "Sparkles",     color: "from-fuchsia-500 to-pink-600" },
+  "Тело":        { icon: "Wind",         color: "from-teal-500 to-cyan-600" },
+  "Волосы":      { icon: "Scissors",     color: "from-amber-500 to-yellow-600" },
+  "СПА":         { icon: "Flower2",      color: "from-purple-500 to-pink-600" },
+  "Криолиполиз": { icon: "Snowflake",    color: "from-cyan-500 to-blue-600" },
+  "РФ-лифтинг":  { icon: "Waves",        color: "from-violet-500 to-purple-600" },
+  "Другое":      { icon: "Star",         color: "from-pink-500 to-rose-600" },
+};
+const DEFAULT_SVC_STYLE = { icon: "Star", color: "from-pink-500 to-rose-500" };
+
+function priceItemToService(it: any, idx: number) {
+  const style = CAT_STYLE[it.category] || DEFAULT_SVC_STYLE;
+  // Парсим длительность: "60 мин" → 60, или просто число
+  const dur = it.duration ? parseInt(String(it.duration)) || 60 : 60;
+  return { id: it.id ?? idx + 1, name: it.name, category: it.category || "Другое", price: it.price || "Уточнить", duration: dur, icon: style.icon, color: style.color };
+}
 
 const DEFAULT_MASTERS = [
   { id: 1, name: "Галина Сиплатова", spec: "Косметолог-эстетист", rating: 5.0, reviews_count: 0, img: GALINA_IMG, tags: ["СМАС-лифтинг", "Биоревитализация", "РФ-лифтинг", "Криолиполиз"] },
@@ -450,7 +454,8 @@ export default function Index() {
   const [client, setClient] = useState<any>(loadClient());
   const [dynamicMasters, setDynamicMasters] = useState<any[]>([]);
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
-  const [selectedServices, setSelectedServices] = useState<typeof services>([]);
+  const [dynamicServices, setDynamicServices] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [selectedMaster, setSelectedMaster] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -486,9 +491,18 @@ export default function Index() {
         setDynamicMasters(DEFAULT_MASTERS);
       }
     }).catch(() => setDynamicMasters(DEFAULT_MASTERS));
+
+    // Загружаем услуги из прайса для формы записи
+    adminPost("pricelist_custom", { active_only: true }).then(d => {
+      if (d.items && d.items.length > 0) {
+        setDynamicServices(d.items.map(priceItemToService));
+      }
+    }).catch(() => {});
   }, []);
 
   const masters = dynamicMasters.length > 0 ? dynamicMasters : DEFAULT_MASTERS;
+  // Услуги для записи = прайс, если загрузился; иначе пусто (покажем состояние загрузки)
+  const bookingServices = dynamicServices;
 
   const handleLogin = (c: any) => {
     const isNew = !loadClient();
@@ -596,7 +610,7 @@ export default function Index() {
             setSelectedTime={setSelectedTime}
             bookingDone={bookingDone}
             confirmBooking={confirmBooking}
-            services={services}
+            services={bookingServices}
             masters={masters}
             weekDays={weekDays}
             timeSlots={timeSlots}
@@ -888,18 +902,14 @@ function PriceListPage({ setPage, onBack, startBooking }: { setPage: (p: Page) =
 
   return (
     <div className="animate-fade-in">
-      {/* Баннер прайс-листа */}
-      <div className="relative h-44 overflow-hidden mb-4">
-        <img src={PRICE_IMG} alt="Прайс-лист" className="w-full h-full object-cover" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(255,220,230,0.1) 0%, rgba(255,240,245,0.88) 100%)" }} />
-        <div className="absolute top-3 left-3">
-          <button onClick={() => onBack ? onBack() : setPage("home")} className="w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(8px)" }}>
-            <Icon name="ChevronLeft" size={18} style={{ color: "hsl(335 60% 40%)" }} />
-          </button>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-          <h1 className="text-3xl font-oswald font-bold" style={{ color: "hsl(335 60% 28%)" }}>Прайс-лист 💅</h1>
+      {/* Заголовок прайс-листа без картинки */}
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3">
+        <button onClick={() => onBack ? onBack() : setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-oswald font-bold" style={{ color: "hsl(335 60% 28%)" }}>Прайс-лист</h1>
           <p className="text-sm" style={{ color: "hsl(335 40% 50%)" }}>Все услуги и цены</p>
         </div>
       </div>
@@ -1159,7 +1169,7 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
         </div>
       </div>
 
-      {/* Шаг 1: выбор услуг (множественный) */}
+      {/* Шаг 1: выбор услуг (множественный) — из прайса */}
       {step === 1 && (
         <div className="px-4 animate-slide-up">
           <h2 className="text-lg font-semibold mb-1" style={{ color: "hsl(335 60% 30%)" }}>Выбери услуги</h2>
@@ -1177,31 +1187,61 @@ function BookingPage({ step, setStep, selectedServices, setSelectedServices, sel
             </div>
           )}
 
-          <div className="space-y-2 max-h-80 overflow-y-auto scrollbar-hide">
-            {svcList.map((s: any) => {
-              const checked = selectedServices.find((x: any) => x.id === s.id);
-              return (
-                <div key={s.id}
-                  className="card-glow rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all"
-                  style={checked ? { borderColor: "hsl(335 80% 70%)", background: "hsl(335 80% 60% / 0.05)" } : {}}
-                  onClick={() => toggleService(s)}>
-                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0`}>
-                    <Icon name={s.icon as any} size={14} className="text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
-                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>{s.duration} мин</div>
-                  </div>
-                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                    style={checked
-                      ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", borderColor: "transparent" }
-                      : { borderColor: "hsl(335 50% 80%)" }}>
-                    {checked && <Icon name="Check" size={11} className="text-white" />}
-                  </div>
+          {/* Загрузка */}
+          {svcList.length === 0 && (
+            <div className="text-center py-10">
+              <div className="text-3xl animate-float mb-2">🌸</div>
+              <p className="text-sm" style={{ color: "hsl(335 30% 60%)" }}>Загружаем услуги...</p>
+            </div>
+          )}
+
+          {/* Группируем по категориям */}
+          {(() => {
+            const grouped: Record<string, any[]> = {};
+            svcList.forEach((s: any) => {
+              const cat = s.category || "Другое";
+              if (!grouped[cat]) grouped[cat] = [];
+              grouped[cat].push(s);
+            });
+            return Object.entries(grouped).map(([cat, catItems]) => (
+              <div key={cat} className="mb-4">
+                <div className="px-2 py-1 mb-2 text-[11px] font-bold uppercase tracking-wider rounded-lg inline-block"
+                  style={{ background: "hsl(335 80% 60% / 0.1)", color: "hsl(335 60% 40%)" }}>
+                  {cat}
                 </div>
-              );
-            })}
-          </div>
+                <div className="space-y-2">
+                  {catItems.map((s: any) => {
+                    const checked = selectedServices.find((x: any) => x.id === s.id);
+                    const durLabel = s.duration ? `${s.duration} мин` : "";
+                    return (
+                      <div key={s.id}
+                        className="card-glow rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all"
+                        style={checked ? { borderColor: "hsl(335 80% 70%)", background: "hsl(335 80% 60% / 0.05)" } : {}}
+                        onClick={() => toggleService(s)}>
+                        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0`}>
+                          <Icon name={s.icon as any} size={14} className="text-white" fallback="Star" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate" style={{ color: "hsl(335 50% 30%)" }}>{s.name}</div>
+                          <div className="text-xs flex gap-2" style={{ color: "hsl(335 30% 60%)" }}>
+                            {durLabel && <span>{durLabel}</span>}
+                            {s.price && s.price !== "Уточнить" && <span style={{ color: "hsl(335 70% 50%)" }}>{s.price}</span>}
+                          </div>
+                        </div>
+                        <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                          style={checked
+                            ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", borderColor: "transparent" }
+                            : { borderColor: "hsl(335 50% 80%)" }}>
+                          {checked && <Icon name="Check" size={11} className="text-white" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ));
+          })()}
+
 
           <button
             onClick={() => selectedServices.length > 0 && setStep(2)}
@@ -1934,7 +1974,108 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents" | "templates" | "site_settings" | "shop_admin";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents" | "templates" | "site_settings" | "shop_admin" | "sections_editor";
+
+// ── Управление разделами сайта ──
+const SECTIONS_KEY = "gp_site_sections";
+type SiteSection = { id: string; label: string; icon: string; enabled: boolean; builtIn: boolean };
+const DEFAULT_SITE_SECTIONS: SiteSection[] = [
+  { id: "gallery", label: "Галерея", icon: "🖼", enabled: true, builtIn: true },
+  { id: "pricelist", label: "Прайс-лист", icon: "💅", enabled: true, builtIn: true },
+  { id: "masters", label: "Мастера", icon: "👩‍⚕️", enabled: true, builtIn: true },
+  { id: "reviews", label: "Отзывы", icon: "⭐", enabled: true, builtIn: true },
+  { id: "documents", label: "Документы", icon: "📄", enabled: true, builtIn: true },
+  { id: "shop", label: "Магазин", icon: "🛍", enabled: true, builtIn: true },
+  { id: "booking", label: "Онлайн-запись", icon: "📅", enabled: true, builtIn: true },
+];
+function loadSiteSections(): SiteSection[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SECTIONS_KEY) || "null");
+    if (!saved) return DEFAULT_SITE_SECTIONS;
+    // Мерджим дефолтные builtIn с сохранёнными
+    const savedMap = Object.fromEntries(saved.map((s: SiteSection) => [s.id, s]));
+    const merged = DEFAULT_SITE_SECTIONS.map(d => savedMap[d.id] ? { ...d, enabled: savedMap[d.id].enabled } : d);
+    const custom = saved.filter((s: SiteSection) => !s.builtIn);
+    return [...merged, ...custom];
+  } catch { return DEFAULT_SITE_SECTIONS; }
+}
+function saveSiteSections(s: SiteSection[]) { localStorage.setItem(SECTIONS_KEY, JSON.stringify(s)); }
+
+function AdminSectionsEditor() {
+  const [sections, setSections] = useState<SiteSection[]>(loadSiteSections());
+  const [newLabel, setNewLabel] = useState("");
+  const [newIcon, setNewIcon] = useState("✨");
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const toggle = (id: string) => {
+    const next = sections.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s);
+    setSections(next); saveSiteSections(next);
+  };
+
+  const addSection = () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    const id = `custom_${Date.now()}`;
+    const next = [...sections, { id, label, icon: newIcon || "✨", enabled: true, builtIn: false }];
+    setSections(next); saveSiteSections(next); setNewLabel(""); setNewIcon("✨");
+  };
+
+  const removeSection = (id: string) => {
+    const next = sections.filter(s => s.id !== id);
+    setSections(next); saveSiteSections(next);
+  };
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-4" style={PS}>Включай и выключай разделы сайта. Выключенные не видны клиентам на главной странице.</p>
+
+      <div className="space-y-2 mb-6">
+        {sections.map(s => (
+          <div key={s.id} className="card-glow rounded-2xl p-4 flex items-center gap-3">
+            <div className="text-2xl w-9 text-center flex-shrink-0">{s.icon}</div>
+            <div className="flex-1">
+              <div className="font-semibold text-sm" style={P}>{s.label}</div>
+              <div className="text-xs" style={PS}>{s.builtIn ? "Встроенный раздел" : "Пользовательский"}</div>
+            </div>
+            {/* Тоггл вкл/выкл */}
+            <button
+              onClick={() => toggle(s.id)}
+              className="w-12 h-6 rounded-full transition-all relative flex-shrink-0"
+              style={{ background: s.enabled ? "hsl(335 80% 58%)" : "hsl(335 20% 82%)" }}>
+              <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+                style={{ left: s.enabled ? 26 : 2 }} />
+            </button>
+            {/* Удалить (только для кастомных) */}
+            {!s.builtIn && (
+              <button onClick={() => removeSection(s.id)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>
+                <Icon name="X" size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Создать новый раздел */}
+      <div className="card-glow rounded-2xl p-4 space-y-3">
+        <div className="font-semibold text-sm" style={P}>Создать новый раздел</div>
+        <div className="flex gap-2">
+          <input value={newIcon} onChange={e => setNewIcon(e.target.value)} placeholder="✨"
+            className="w-14 px-2 py-2.5 rounded-xl text-center text-lg outline-none flex-shrink-0" style={inp} />
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addSection()}
+            placeholder="Название раздела..." autoComplete="off"
+            className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+        </div>
+        <button onClick={addSection} disabled={!newLabel.trim()}
+          className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          + Создать раздел
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1983,11 +2124,12 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "shop_admin", icon: "ShoppingBag", label: "Магазин", color: "from-pink-500 to-rose-400", ownerOnly: true },
     { id: "site_settings", icon: "Paintbrush", label: "Оформление", color: "from-fuchsia-500 to-pink-500", ownerOnly: true },
     { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
+    { id: "sections_editor", icon: "LayoutDashboard", label: "Разделы сайта", color: "from-teal-500 to-cyan-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
   ];
 
   const visibleMenu = isOwner ? menuItems : menuItems.filter(m => !m.ownerOnly);
-  const currentLabel = section === "dashboard" ? "Панель управления" : menuItems.find(m => m.id === section)?.label;
+  const currentLabel = section === "dashboard" ? "Панель управления" : (menuItems.find(m => m.id === section)?.label ?? "Разделы сайта");
 
   return (
     <div className="animate-fade-in">
@@ -2103,6 +2245,7 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "shop_admin" && isOwner && <AdminShop />}
       {section === "site_settings" && isOwner && <AdminSiteSettings />}
       {section === "documents" && isOwner && <AdminDocuments />}
+      {section === "sections_editor" && isOwner && <AdminSectionsEditor />}
       {/* Настройки теперь содержат сотрудников */}
       {section === "settings" && isOwner && <AdminSettingsHub currentStaffId={adminUser.id} />}
       {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
@@ -3854,9 +3997,9 @@ function AdminGalleryFolders() {
       </button>
       {addingPhoto && (
         <div className="card-glow rounded-2xl p-4 mb-4 space-y-3">
-          {/* Загрузка с телефона */}
+          {/* Загрузка с телефона — кладём в подпапку папки */}
           <PhotoUploadButton
-            folder="gallery"
+            folder={`gallery/${activeFolder.name.toLowerCase().replace(/\s+/g, "_")}`}
             label="📷 Выбрать фото из галереи"
             uploading={uploadingPhoto}
             setUploading={setUploadingPhoto}
