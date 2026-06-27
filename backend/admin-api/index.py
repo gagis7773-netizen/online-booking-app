@@ -200,15 +200,55 @@ def handler(event: dict, context) -> dict:
 
     # ── КЛИЕНТЫ ──
     if section == "clients":
+        if body.get("action") == "update_discount":
+            cur.execute(f"UPDATE {SCHEMA}.clients SET discount_percent=%s WHERE id=%s",
+                        (int(body.get("discount_percent", 0)), body.get("id")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        filter_type = body.get("filter", "all")
+        # Проверяем чёрный список
+        bl_ids = set()
+        cur.execute(f"SELECT client_id FROM {SCHEMA}.blacklist WHERE client_id IS NOT NULL")
+        for row in cur.fetchall():
+            if row["client_id"]: bl_ids.add(row["client_id"])
         cur.execute(f"""
-            SELECT c.id, c.name, c.phone, c.created_at,
+            SELECT c.id, c.name, c.phone, c.created_at, c.birthdate, c.discount_percent,
                    COUNT(b.id) AS bookings_count, MAX(b.created_at) AS last_booking
             FROM {SCHEMA}.clients c
             LEFT JOIN {SCHEMA}.bookings b ON b.client_id = c.id
             GROUP BY c.id ORDER BY c.created_at DESC
         """)
+        all_clients = [dict(r) for r in cur.fetchall()]
+        if filter_type == "blacklist":
+            rows = [c for c in all_clients if c["id"] in bl_ids]
+        elif filter_type == "dormant":
+            # Спящие — не было записей больше 60 дней или вообще нет
+            import datetime
+            threshold = datetime.datetime.now() - datetime.timedelta(days=60)
+            rows = [c for c in all_clients
+                    if c["id"] not in bl_ids and (not c["last_booking"] or c["last_booking"] < threshold)]
+        elif filter_type == "active":
+            import datetime
+            threshold = datetime.datetime.now() - datetime.timedelta(days=60)
+            rows = [c for c in all_clients
+                    if c["id"] not in bl_ids and c["last_booking"] and c["last_booking"] >= threshold]
+        else:
+            rows = [c for c in all_clients if c["id"] not in bl_ids]
+        conn.close(); return resp({"clients": rows, "total": len(rows), "blacklist_ids": list(bl_ids)})
+
+    # ── ЧЁРНЫЙ СПИСОК ──
+    if section == "blacklist":
+        if body.get("action") == "add":
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.blacklist (client_id, phone, name, reason)
+                VALUES (%s,%s,%s,%s) RETURNING id
+            """, (body.get("client_id"), body.get("phone",""), body.get("name",""), body.get("reason","")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        if body.get("action") == "remove":
+            cur.execute(f"UPDATE {SCHEMA}.blacklist SET client_id=NULL WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.blacklist ORDER BY created_at DESC")
         rows = [dict(r) for r in cur.fetchall()]
-        conn.close(); return resp({"clients": rows, "total": len(rows)})
+        conn.close(); return resp({"blacklist": rows})
 
     # ── СОТРУДНИКИ ──
     if section == "staff":
@@ -473,6 +513,33 @@ def handler(event: dict, context) -> dict:
             sent = send_sms(owner_phone, message)
         conn.close()
         return resp({"ok": True, "sent": sent})
+
+    # ── НАСТРОЙКИ САЙТА ──
+    if section == "site_settings":
+        if body.get("action") == "save":
+            for key, value in body.get("settings", {}).items():
+                cur.execute(f"""
+                    INSERT INTO {SCHEMA}.site_settings (key, value, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+                """, (key, str(value)))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT key, value FROM {SCHEMA}.site_settings")
+        result = {r["key"]: r["value"] for r in cur.fetchall()}
+        conn.close(); return resp({"settings": result})
+
+    # ── ШАБЛОНЫ УВЕДОМЛЕНИЙ ──
+    if section == "notification_templates":
+        if body.get("action") == "save":
+            cur.execute(f"""
+                UPDATE {SCHEMA}.notification_templates
+                SET body=%s, title=%s, updated_at=NOW()
+                WHERE template_key=%s
+            """, (body.get("body",""), body.get("title",""), body.get("template_key","")))
+            conn.commit(); conn.close(); return resp({"ok": True})
+        cur.execute(f"SELECT * FROM {SCHEMA}.notification_templates ORDER BY id")
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close(); return resp({"templates": rows})
 
     conn.close()
     return resp({"error": "Unknown section"}, 400)

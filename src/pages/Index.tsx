@@ -71,7 +71,7 @@ function PhotoUploadButton({
   );
 }
 
-type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery";
+type Page = "home" | "pricelist" | "masters" | "booking" | "profile" | "reviews" | "admin" | "chat" | "gallery" | "documents";
 
 const services = [
   { id: 1, name: "Криолиполиз", category: "Тело", price: 0, duration: 60, icon: "Snowflake", color: "from-cyan-500 to-blue-600" },
@@ -121,6 +121,7 @@ export default function Index() {
   const [page, setPage] = useState<Page>("home");
   const [client, setClient] = useState<any>(loadClient());
   const [dynamicMasters, setDynamicMasters] = useState<any[]>([]);
+  const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [selectedServices, setSelectedServices] = useState<typeof services>([]);
   const [selectedMaster, setSelectedMaster] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState(0);
@@ -129,6 +130,7 @@ export default function Index() {
   const [bookingDone, setBookingDone] = useState(false);
 
   useEffect(() => {
+    adminPost("site_settings").then(d => setSiteSettings(d.settings || {})).catch(() => {});
     adminPost("masters", { active_only: true }).then(d => {
       if (d.masters && d.masters.length > 0) {
         setDynamicMasters(d.masters.map((m: any) => ({
@@ -184,12 +186,6 @@ export default function Index() {
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "linear-gradient(135deg, #fff5f7 0%, #fce4ec 30%, #fdf6f8 60%, #fff0f3 100%)" }}>
-      {/* Надпись в углу */}
-      <div className="fixed top-2 left-2 z-50 pointer-events-none">
-        <span className="text-[9px] font-medium tracking-wide opacity-40" style={{ color: "hsl(335 50% 45%)" }}>
-          приложение для онлайн записи
-        </span>
-      </div>
       {/* Floating sparkles */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full opacity-20"
@@ -205,7 +201,7 @@ export default function Index() {
       </div>
 
       <div className="relative z-10 pb-24">
-        {page === "home" && <HomePage setPage={setPage} startBooking={startBooking} client={client} masters={masters} />}
+        {page === "home" && <HomePage setPage={setPage} startBooking={startBooking} client={client} masters={masters} siteSettings={siteSettings} />}
         {page === "pricelist" && <PriceListPage setPage={setPage} startBooking={startBooking} />}
         {page === "masters" && <MastersPage masters={masters} setPage={setPage} startBooking={startBooking} />}
         {page === "booking" && (
@@ -236,6 +232,7 @@ export default function Index() {
         )}
         {page === "reviews" && <ReviewsPage onBack={() => setPage("home")} />}
         {page === "gallery" && <ClientGalleryPage setPage={setPage} />}
+        {page === "documents" && <ClientDocumentsPage setPage={setPage} />}
         {page === "chat" && <ChatPage onBack={() => setPage("home")} />}
         {page === "admin" && <AdminPage onBack={() => setPage("home")} />}
       </div>
@@ -247,7 +244,7 @@ export default function Index() {
 
 // ─── HOME ───────────────────────────────────────────────────────────────────
 
-function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Page) => void; startBooking: () => void; client: any; masters: any[] }) {
+function HomePage({ setPage, startBooking, client, masters, siteSettings }: { setPage: (p: Page) => void; startBooking: () => void; client: any; masters: any[]; siteSettings: Record<string, string> }) {
   const [pressTimer, setPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLogoPress = () => {
@@ -258,11 +255,19 @@ function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Pag
     if (pressTimer) clearTimeout(pressTimer);
   };
 
+  const heroImg = siteSettings.hero_image_url || SALON_IMG;
+  const wallImg = siteSettings.wall_image_url || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=85";
+  const btnColor = siteSettings.hero_color_from || "hsl(335 80% 58%)";
+  const btnGrad = { background: `linear-gradient(135deg, ${btnColor}, ${siteSettings.hero_color_to || "hsl(315 70% 65%)"})` };
+  const salonPhone = siteSettings.salon_phone || "+79046015556";
+  const salonAddress = siteSettings.salon_address || "м. Парнас · ул. Заречная, 10";
+  const salonMapsUrl = siteSettings.salon_maps_url || "https://yandex.ru/maps/org/devchachiy_ray/46803820767";
+
   return (
     <div className="animate-fade-in">
       {/* Hero */}
       <div className="relative h-[480px] overflow-hidden">
-        <img src={SALON_IMG} alt="Girly Paradise" className="w-full h-full object-cover" />
+        <img src={heroImg} alt="Girly Paradise" className="w-full h-full object-cover" />
         <div className="absolute inset-0" style={{
           background: "linear-gradient(to bottom, rgba(255,220,230,0.15) 0%, rgba(255,182,193,0.25) 40%, rgba(255,240,245,0.96) 100%)"
         }} />
@@ -274,17 +279,17 @@ function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Pag
             <img src={LOGO_IMG} alt="Girly Paradise" className="w-full h-full object-contain p-1" />
           </div>
           <div className="flex flex-col items-end gap-1.5 pt-1">
-            <a href="tel:+79046015556"
+            <a href={`tel:${salonPhone}`}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
               style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)", color: "hsl(335 80% 45%)", border: "1px solid hsl(335 80% 80%)" }}>
               <Icon name="Phone" size={11} />
-              <span>+7 (904) 601-55-56</span>
+              <span>{salonPhone}</span>
             </a>
-            <a href="https://yandex.ru/maps/org/devchachiy_ray/46803820767?si=tk0bmt4ttr79ee9mkbgjgzmduc" target="_blank" rel="noopener noreferrer"
+            <a href={salonMapsUrl} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
               style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", color: "hsl(335 60% 50%)", border: "1px solid hsl(335 50% 85%)" }}>
               <Icon name="MapPin" size={11} />
-              <span>м. Парнас · ул. Заречная, 10 →</span>
+              <span>{salonAddress} →</span>
             </a>
           </div>
         </div>
@@ -292,10 +297,9 @@ function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Pag
           <h1 className="text-4xl font-oswald font-bold leading-tight mb-3" style={{ color: "hsl(335 60% 30%)" }}>
             Онлайн запись<br /><span className="gradient-text">в один клик</span>
           </h1>
-          <button
-            onClick={startBooking}
+          <button onClick={startBooking}
             className="w-full py-3.5 rounded-2xl font-semibold text-white text-base animate-pulse-glow shadow-lg"
-            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+            style={btnGrad}>
             🌸 Записаться сейчас
           </button>
         </div>
@@ -327,6 +331,24 @@ function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Pag
         </div>
       </div>
 
+      {/* Картина на стене */}
+      <div className="px-4 mb-5">
+        <div className="relative rounded-3xl overflow-hidden shadow-xl" style={{ height: 220 }}>
+          <img
+            src={wallImg}
+            alt="Красота и стиль"
+            className="w-full h-full object-cover object-top"
+          />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(255,235,242,0.85) 100%)" }} />
+          <div className="absolute bottom-3 left-4">
+            <p className="text-sm font-semibold font-oswald" style={{ color: "hsl(335 60% 28%)" }}>Красота — это искусство</p>
+            <p className="text-xs" style={{ color: "hsl(335 40% 50%)" }}>Girly Paradise Beauty</p>
+          </div>
+          {/* Рамка как картина */}
+          <div className="absolute inset-1 rounded-2xl pointer-events-none" style={{ border: "2px solid rgba(255,255,255,0.4)" }} />
+        </div>
+      </div>
+
       {/* Разделы */}
       <div className="px-4 mb-5">
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
@@ -335,6 +357,7 @@ function HomePage({ setPage, startBooking, client, masters }: { setPage: (p: Pag
             { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList" },
             { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images" },
             { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star" },
+            { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText" },
           ].map(item => (
             <button key={item.page} onClick={() => setPage(item.page)}
               className="card-glow rounded-2xl p-4 text-left hover:scale-105 transition-all">
@@ -929,6 +952,7 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
   const [mode, setMode] = useState<"auth" | "register">("auth");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [birthdate, setBirthdate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -954,7 +978,7 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
       const res = await fetch(AUTH_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: mode === "register" ? "register" : "login", phone: "+" + digits, name: name.trim() }),
+        body: JSON.stringify({ action: mode === "register" ? "register" : "login", phone: "+" + digits, name: name.trim(), birthdate: birthdate || undefined }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -999,16 +1023,22 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
 
           <div className="space-y-3">
             {mode === "register" && (
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: "hsl(335 40% 55%)" }}>Имя</label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Введи своё имя"
-                  className="w-full px-4 py-3.5 rounded-xl text-sm outline-none"
-                  style={{ background: "white", border: "1.5px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }}
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: "hsl(335 40% 55%)" }}>Имя</label>
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Введи своё имя"
+                    className="w-full px-4 py-3.5 rounded-xl text-sm outline-none"
+                    style={{ background: "white", border: "1.5px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: "hsl(335 40% 55%)" }}>
+                    Дата рождения <span style={{ color: "hsl(335 30% 70%)" }}>(по желанию)</span>
+                  </label>
+                  <input type="date" value={birthdate} onChange={e => setBirthdate(e.target.value)}
+                    className="w-full px-4 py-3.5 rounded-xl text-sm outline-none"
+                    style={{ background: "white", border: "1.5px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
+                </div>
+              </>
             )}
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: "hsl(335 40% 55%)" }}>Номер телефона</label>
@@ -1286,7 +1316,7 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
 
 // ─── ПАНЕЛЬ ВЛАДЕЛЬЦА ────────────────────────────────────────────────────────
 
-type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents";
+type AdminSection = "dashboard" | "clients" | "schedule" | "messages" | "notifications" | "expenses" | "gallery" | "staff" | "settings" | "profile_edit" | "pricelist_edit" | "broadcast" | "analytics" | "masters_edit" | "documents" | "templates" | "site_settings";
 
 const P = { color: "hsl(335 50% 30%)" };
 const PS = { color: "hsl(335 30% 60%)" };
@@ -1327,6 +1357,8 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
     { id: "masters_edit", icon: "UserCircle", label: "Мастера", color: "from-rose-400 to-pink-500", ownerOnly: true },
     { id: "broadcast", icon: "Send", label: "Рассылка", color: "from-sky-500 to-blue-500", ownerOnly: true },
+    { id: "templates", icon: "MessageSquare", label: "Шаблоны SMS", color: "from-lime-500 to-green-500", ownerOnly: true },
+    { id: "site_settings", icon: "Paintbrush", label: "Оформление", color: "from-fuchsia-500 to-pink-500", ownerOnly: true },
     { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
     { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
@@ -1408,6 +1440,8 @@ function AdminPage({ onBack }: { onBack: () => void }) {
       {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
       {section === "masters_edit" && isOwner && <AdminMastersEditor />}
       {section === "broadcast" && isOwner && <AdminBroadcast />}
+      {section === "templates" && isOwner && <AdminNotificationTemplates />}
+      {section === "site_settings" && isOwner && <AdminSiteSettings />}
       {section === "documents" && isOwner && <AdminDocuments />}
       {section === "staff" && isOwner && <AdminStaff currentStaffId={adminUser.id} />}
       {section === "settings" && isOwner && <AdminSettings />}
@@ -1966,46 +2000,205 @@ function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void;
 // ── Клиенты ──
 function AdminClients() {
   const [clients, setClients] = useState<any[]>([]);
+  const [blacklist, setBlacklist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "active" | "dormant" | "blacklist">("all");
+  const [selected, setSelected] = useState<any | null>(null);
+  const [discountVal, setDiscountVal] = useState("");
+  const [blReason, setBlReason] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    adminPost("clients").then(d => { setClients(d.clients || []); setLoading(false); });
-  }, []);
+  const load = () => {
+    setLoading(true);
+    Promise.all([
+      adminPost("clients", { filter }),
+      adminPost("blacklist"),
+    ]).then(([cd, bl]) => {
+      setClients(cd.clients || []);
+      setBlacklist(bl.blacklist || []);
+      setLoading(false);
+    });
+  };
+
+  useEffect(() => { load(); }, [filter]);
 
   const filtered = clients.filter(c =>
     c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search)
   );
 
+  const addToBlacklist = async (c: any) => {
+    if (!blReason.trim()) { alert("Укажи причину"); return; }
+    setSaving(true);
+    await adminPost("blacklist", { action: "add", client_id: c.id, phone: c.phone, name: c.name, reason: blReason });
+    setBlReason(""); setSelected(null); setSaving(false); load();
+  };
+
+  const saveDiscount = async (c: any) => {
+    setSaving(true);
+    await adminPost("clients", { action: "update_discount", id: c.id, discount_percent: parseInt(discountVal) || 0 });
+    setSaving(false); setSelected(null); load();
+  };
+
+  const removeFromBL = async (id: number) => {
+    await adminPost("blacklist", { action: "remove", id }); load();
+  };
+
+  const MONTH_RU = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+  const formatBirthdate = (bd: string | null) => {
+    if (!bd) return null;
+    const d = new Date(bd);
+    return `${d.getDate()} ${MONTH_RU[d.getMonth()]}`;
+  };
+  const isBirthdaySoon = (bd: string | null) => {
+    if (!bd) return false;
+    const now = new Date();
+    const bDay = new Date(bd);
+    const next = new Date(now.getFullYear(), bDay.getMonth(), bDay.getDate());
+    if (next < now) next.setFullYear(now.getFullYear() + 1);
+    return (next.getTime() - now.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+  };
+
+  const tabs = [
+    { id: "all", label: "Все" },
+    { id: "active", label: "Активные" },
+    { id: "dormant", label: "Спящие" },
+    { id: "blacklist", label: "ЧС" },
+  ] as const;
+
   return (
     <div className="px-4 pb-6">
-      <div className="relative mb-4">
+      {/* Табы */}
+      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide pb-1">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => { setFilter(t.id); setSelected(null); }}
+            className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={filter === t.id ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Поиск */}
+      <div className="relative mb-3">
         <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(335 50% 65%)" }} />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..."
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по имени или телефону..."
           className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
           style={{ background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" }} />
       </div>
-      <p className="text-xs mb-3" style={PS}>{filtered.length} клиентов</p>
+
+      {filter === "dormant" && (
+        <p className="text-xs mb-3 px-1" style={PS}>Клиенты без записей более 60 дней или никогда не записывавшиеся</p>
+      )}
+      {filter === "blacklist" && (
+        <p className="text-xs mb-3 px-1" style={{ color: "hsl(0 70% 55%)" }}>Клиенты в чёрном списке — не записываются</p>
+      )}
+
+      <p className="text-xs mb-3 px-1" style={PS}>{filter === "blacklist" ? blacklist.length : filtered.length} чел.</p>
       {loading && <div className="text-center py-10"><div className="text-3xl animate-float">🌸</div></div>}
-      <div className="space-y-2">
-        {filtered.map((c, i) => (
-          <div key={c.id} className="card-glow rounded-2xl p-4" style={{ animationDelay: `${i * 0.03}s` }}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={GRAD}>
-                {c.name?.[0]?.toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate text-sm" style={P}>{c.name}</div>
-                <a href={`tel:${c.phone}`} className="text-sm" style={{ color: "hsl(335 80% 55%)" }}>{c.phone}</a>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <div className="text-xs font-medium" style={{ color: "hsl(335 50% 40%)" }}>{c.bookings_count} зап.</div>
-                <div className="text-xs" style={PS}>с {c.registered_at}</div>
+
+      {/* Чёрный список */}
+      {filter === "blacklist" && (
+        <div className="space-y-2">
+          {blacklist.map((b) => (
+            <div key={b.id} className="card-glow rounded-2xl p-4 border" style={{ borderColor: "hsl(0 60% 88%)", background: "hsl(0 60% 99%)" }}>
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: "hsl(0 70% 55%)" }}>
+                  🚫
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={P}>{b.name}</div>
+                  <div className="text-xs" style={{ color: "hsl(335 80% 55%)" }}>{b.phone}</div>
+                  {b.reason && <div className="text-xs mt-1" style={{ color: "hsl(0 60% 50%)" }}>Причина: {b.reason}</div>}
+                </div>
+                <button onClick={() => removeFromBL(b.id)} className="px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0"
+                  style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 50%)" }}>Убрать</button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          {blacklist.length === 0 && <div className="text-center py-8 text-sm" style={PS}>Чёрный список пуст</div>}
+        </div>
+      )}
+
+      {/* Обычный список */}
+      {filter !== "blacklist" && (
+        <div className="space-y-2">
+          {filtered.map((c) => (
+            <div key={c.id}>
+              <button onClick={() => { setSelected(selected?.id === c.id ? null : c); setDiscountVal(String(c.discount_percent || 0)); setBlReason(""); }}
+                className="w-full card-glow rounded-2xl p-4 text-left transition-all"
+                style={selected?.id === c.id ? { border: "1.5px solid hsl(335 70% 75%)" } : {}}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={GRAD}>
+                    {c.name?.[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold truncate text-sm" style={P}>{c.name}</div>
+                      {isBirthdaySoon(c.birthdate) && <span className="text-xs">🎂</span>}
+                      {(c.discount_percent > 0) && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "hsl(142 60% 92%)", color: "hsl(142 60% 35%)" }}>
+                          -{c.discount_percent}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs flex items-center gap-2 flex-wrap" style={PS}>
+                      <span>{c.phone}</span>
+                      {c.birthdate && <span>🎂 {formatBirthdate(c.birthdate)}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xs font-medium" style={{ color: "hsl(335 50% 40%)" }}>{c.bookings_count || 0} зап.</div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Панель действий */}
+              {selected?.id === c.id && (
+                <div className="card-glow rounded-2xl p-4 mt-1 mb-1 space-y-3 animate-slide-up">
+                  <a href={`tel:${c.phone}`} className="flex items-center gap-2 text-sm font-medium" style={{ color: "hsl(335 80% 55%)" }}>
+                    <Icon name="Phone" size={14} /> Позвонить {c.phone}
+                  </a>
+                  {/* Скидка */}
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={PS}>Скидка клиента (%)</label>
+                    <div className="flex gap-2">
+                      {[0, 5, 10, 15, 20].map(d => (
+                        <button key={d} onClick={() => setDiscountVal(String(d))}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={discountVal === String(d)
+                            ? { ...GRAD, color: "white" }
+                            : { background: "hsl(335 20% 93%)", color: "hsl(335 50% 50%)" }}>
+                          {d > 0 ? `-${d}%` : "Нет"}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => saveDiscount(c)} disabled={saving}
+                      className="w-full py-2 rounded-xl text-xs font-semibold text-white mt-2" style={GRAD}>
+                      {saving ? "..." : "Сохранить скидку"}
+                    </button>
+                  </div>
+                  {/* Добавить в ЧС */}
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(0 60% 50%)" }}>Добавить в чёрный список</label>
+                    <input value={blReason} onChange={e => setBlReason(e.target.value)} placeholder="Причина..."
+                      className="w-full px-3 py-2 rounded-xl text-xs outline-none mb-2"
+                      style={{ background: "white", border: "1px solid hsl(0 50% 88%)", color: "hsl(335 50% 30%)" }} />
+                    <button onClick={() => addToBlacklist(c)} disabled={saving || !blReason.trim()}
+                      className="w-full py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 45%)", border: "1px solid hsl(0 50% 85%)" }}>
+                      🚫 В чёрный список
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {!loading && filtered.length === 0 && (
+            <div className="text-center py-10"><div className="text-3xl mb-2">👥</div><p className="text-sm" style={PS}>Клиентов нет</p></div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2755,6 +2948,33 @@ function AdminPricelistEditor() {
         </div>
       ))}
       {!loading && items.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Услуг пока нет — добавьте первую!</div>}
+
+      {items.length > 0 && (
+        <div className="mt-6 card-glow rounded-2xl p-4">
+          <div className="font-semibold text-sm mb-3" style={P}>Выгрузить прайс</div>
+          <button onClick={() => {
+            const header = "Категория,Название,Цена,Длительность,Описание\n";
+            const rows = items.map((it: any) =>
+              `"${it.category}","${it.name}","${it.price || ""}","${it.duration || ""}","${it.description || ""}"`
+            ).join("\n");
+            const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = "praiс-list.csv"; a.click();
+            URL.revokeObjectURL(url);
+          }} className="w-full py-3 rounded-xl font-semibold text-white text-sm mb-2" style={GRAD}>
+            ⬇️ Скачать CSV
+          </button>
+          <button onClick={() => {
+            const lines = items.map((it: any) =>
+              `${it.name} — ${it.price || "цена по запросу"}${it.duration ? ` (${it.duration})` : ""}`
+            ).join("\n");
+            navigator.clipboard.writeText(lines).then(() => alert("Прайс скопирован!"));
+          }} className="w-full py-2.5 rounded-xl text-sm font-medium"
+            style={{ background: "hsl(335 20% 93%)", color: "hsl(335 50% 50%)" }}>
+            📋 Скопировать текстом
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -3426,6 +3646,287 @@ function AdminWorkSchedule() {
       <button onClick={save} disabled={saving} className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg mt-4" style={GRAD}>
         {saved ? "Сохранено ✓" : saving ? "Сохраняем..." : "Сохранить расписание"}
       </button>
+    </div>
+  );
+}
+
+// ── Шаблоны уведомлений ──
+function AdminNotificationTemplates() {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [saving, setSaving] = useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const VARS = ["{service}", "{day}", "{time}", "{address}", "{phone}", "{name}"];
+
+  const load = () => adminPost("notification_templates").then(d => { setTemplates(d.templates || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    await adminPost("notification_templates", { action: "save", template_key: editing.template_key, title: editing.title, body: editing.body });
+    setSaving(false); setEditing(null); load();
+  };
+
+  return (
+    <div className="px-4 pb-6">
+      <p className="text-xs mb-4" style={PS}>
+        Переменные: {VARS.map(v => <code key={v} className="mx-0.5 px-1 rounded text-[10px]" style={{ background: "hsl(335 50% 95%)", color: "hsl(335 70% 45%)" }}>{v}</code>)}
+      </p>
+
+      {editing ? (
+        <div className="card-glow rounded-2xl p-4 space-y-3">
+          <button onClick={() => setEditing(null)} className="flex items-center gap-1.5 text-sm mb-2" style={PS}>
+            <Icon name="ChevronLeft" size={16} /> Назад
+          </button>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={PS}>Название шаблона</label>
+            <input value={editing.title} onChange={e => setEditing((p: any) => ({ ...p, title: e.target.value }))}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-2" style={PS}>Текст сообщения</label>
+            <textarea value={editing.body} onChange={e => setEditing((p: any) => ({ ...p, body: e.target.value }))}
+              rows={5} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={inp} />
+            <p className="text-xs mt-1" style={PS}>{editing.body?.length || 0} символов</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {VARS.map(v => (
+              <button key={v} onClick={() => setEditing((p: any) => ({ ...p, body: (p.body || "") + v }))}
+                className="px-2 py-1 rounded-lg text-[11px] font-medium"
+                style={{ background: "hsl(335 50% 95%)", color: "hsl(335 70% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
+                +{v}
+              </button>
+            ))}
+          </div>
+          <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+            {saving ? "Сохраняем..." : "Сохранить шаблон"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {loading && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+          <div className="space-y-3">
+            {templates.map(t => (
+              <div key={t.id} className="card-glow rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm mb-1" style={P}>{t.title}</div>
+                    <p className="text-xs leading-relaxed line-clamp-2" style={PS}>{t.body}</p>
+                  </div>
+                  <button onClick={() => setEditing({ ...t })} className="px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
+                    style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>
+                    ✏️ Изменить
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Оформление сайта ──
+function AdminSiteSettings() {
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [uploadingWall, setUploadingWall] = useState(false);
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
+
+  const load = () => adminPost("site_settings").then(d => { setSettings(d.settings || {}); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const set = (key: string, val: string) => setSettings(p => ({ ...p, [key]: val }));
+
+  const saveAll = async () => {
+    setSaving(true);
+    await adminPost("site_settings", { action: "save", settings });
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const COLORS = ["hsl(335 80% 58%)", "hsl(0 70% 55%)", "hsl(270 60% 55%)", "hsl(210 70% 50%)", "hsl(150 60% 45%)", "hsl(30 80% 50%)"];
+
+  if (loading) return <div className="text-center py-12"><div className="text-3xl animate-float">🌸</div></div>;
+
+  return (
+    <div className="px-4 pb-6 space-y-5">
+      {/* Цвет главного экрана */}
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold text-sm mb-3" style={P}>Цвет главного экрана</div>
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {COLORS.map(c => (
+            <button key={c} onClick={() => { set("hero_color_from", c); set("hero_color_to", c); }}
+              className="h-10 rounded-xl border-2 transition-all"
+              style={{ background: c, borderColor: settings.hero_color_from === c ? "hsl(335 80% 40%)" : "transparent" }} />
+          ))}
+        </div>
+        <div>
+          <label className="text-xs block mb-1" style={PS}>Цвет кнопок (HEX или hsl)</label>
+          <input value={settings.hero_color_from || ""} onChange={e => set("hero_color_from", e.target.value)}
+            placeholder="hsl(335 80% 58%)" className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={inp} />
+        </div>
+      </div>
+
+      {/* Обложка (hero) */}
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold text-sm mb-3" style={P}>Обложка главного экрана</div>
+        <PhotoUploadButton folder="hero" label="📷 Загрузить обложку" uploading={uploadingHero} setUploading={setUploadingHero}
+          onUploaded={url => set("hero_image_url", url)} className="w-full mb-2" />
+        {settings.hero_image_url && (
+          <img src={settings.hero_image_url} className="w-full h-36 object-cover rounded-xl" alt="hero" />
+        )}
+        {settings.hero_image_url && (
+          <button onClick={() => set("hero_image_url", "")} className="text-xs mt-2" style={{ color: "hsl(0 60% 50%)" }}>
+            Убрать обложку
+          </button>
+        )}
+      </div>
+
+      {/* Картина на стене */}
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold text-sm mb-1" style={P}>Картина на стене (главная)</div>
+        <p className="text-xs mb-3" style={PS}>Изображение между блоком мастеров и разделами</p>
+        <PhotoUploadButton folder="wall" label="📷 Загрузить картину" uploading={uploadingWall} setUploading={setUploadingWall}
+          onUploaded={url => set("wall_image_url", url)} className="w-full mb-2" />
+        {settings.wall_image_url && (
+          <img src={settings.wall_image_url} className="w-full h-32 object-cover rounded-xl" alt="wall" />
+        )}
+      </div>
+
+      {/* Адрес и контакты */}
+      <div className="card-glow rounded-2xl p-4 space-y-3">
+        <div className="font-semibold text-sm mb-1" style={P}>Контакты и адрес</div>
+        {[
+          { key: "salon_name", label: "Название салона" },
+          { key: "salon_phone", label: "Телефон" },
+          { key: "salon_address", label: "Адрес" },
+          { key: "salon_maps_url", label: "Ссылка на Яндекс Карты" },
+        ].map(f => (
+          <div key={f.key}>
+            <label className="text-xs block mb-1" style={PS}>{f.label}</label>
+            <input value={settings[f.key] || ""} onChange={e => set(f.key, e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+          </div>
+        ))}
+      </div>
+
+      {/* Выходные дни */}
+      <div className="card-glow rounded-2xl p-4">
+        <div className="font-semibold text-sm mb-1" style={P}>Выходные дни</div>
+        <p className="text-xs mb-3" style={PS}>Выбери дни недели когда салон не работает</p>
+        <div className="grid grid-cols-4 gap-2">
+          {["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].map((day, idx) => {
+            const daysOff: number[] = JSON.parse(settings.days_off || "[]");
+            const isOff = daysOff.includes(idx);
+            return (
+              <button key={day} onClick={() => {
+                const current: number[] = JSON.parse(settings.days_off || "[]");
+                const updated = isOff ? current.filter(d => d !== idx) : [...current, idx];
+                set("days_off", JSON.stringify(updated));
+              }}
+                className="py-2 rounded-xl text-xs font-semibold transition-all"
+                style={isOff ? { background: "hsl(0 60% 55%)", color: "white" } : { background: "hsl(335 20% 93%)", color: "hsl(335 50% 50%)" }}>
+                {day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {saved && (
+        <div className="p-3 rounded-xl text-sm font-medium text-center"
+          style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>
+          ✓ Настройки сохранены
+        </div>
+      )}
+
+      <button onClick={saveAll} disabled={saving} className="w-full py-4 rounded-2xl font-semibold text-white shadow-lg" style={GRAD}>
+        {saving ? "Сохраняем..." : "💾 Сохранить всё"}
+      </button>
+    </div>
+  );
+}
+
+// ── Публичная страница документов ──
+function ClientDocumentsPage({ setPage }: { setPage: (p: Page) => void }) {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fullscreen, setFullscreen] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminPost("documents", { active_only: true }).then(d => { setDocs(d.documents || []); setLoading(false); });
+  }, []);
+
+  const DOC_TYPE_LABELS: Record<string, string> = {
+    certificate: "Сертификат", license: "Лицензия", diploma: "Диплом", other: "Документ",
+  };
+
+  if (fullscreen) return (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={() => setFullscreen(null)}>
+      <img src={fullscreen} className="max-w-full max-h-full object-contain rounded-xl" alt="документ" />
+      <button className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-xl font-bold">✕</button>
+    </div>
+  );
+
+  return (
+    <div className="animate-fade-in">
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3">
+        <button onClick={() => setPage("home")} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(335 50% 92%)", border: "1px solid hsl(335 50% 82%)" }}>
+          <Icon name="ChevronLeft" size={20} style={{ color: "hsl(335 60% 40%)" }} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-oswald font-bold" style={P}>Документы 📄</h1>
+          <p className="text-xs" style={PS}>Сертификаты и лицензии</p>
+        </div>
+      </div>
+
+      <div className="px-4 pb-6">
+        {loading && <div className="text-center py-12"><div className="text-3xl animate-float">🌸</div></div>}
+        {!loading && docs.length === 0 && (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">📄</div>
+            <p className="text-sm" style={PS}>Документы скоро появятся</p>
+          </div>
+        )}
+        <div className="space-y-3">
+          {docs.map(doc => (
+            <div key={doc.id} className="card-glow rounded-2xl overflow-hidden">
+              {doc.file_url && /\.(jpg|jpeg|png|webp)/i.test(doc.file_url) && (
+                <button onClick={() => setFullscreen(doc.file_url)} className="w-full">
+                  <img src={doc.file_url} className="w-full h-48 object-cover" alt={doc.title} />
+                </button>
+              )}
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-sm" style={P}>{doc.title}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "hsl(335 80% 55%)" }}>
+                      {DOC_TYPE_LABELS[doc.doc_type] || "Документ"}
+                    </div>
+                    {doc.description && <p className="text-xs mt-1" style={PS}>{doc.description}</p>}
+                  </div>
+                  {doc.file_url && /\.(jpg|jpeg|png|webp)/i.test(doc.file_url) && (
+                    <button onClick={() => setFullscreen(doc.file_url)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
+                      style={{ background: "hsl(335 50% 95%)", color: "hsl(335 60% 45%)" }}>
+                      <Icon name="ZoomIn" size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -32,6 +32,8 @@ def handler(event: dict, context) -> dict:
     conn = get_conn()
     cur = conn.cursor()
 
+    birthdate = (body.get("birthdate") or "").strip()
+
     if action == "register":
         if not name:
             conn.close()
@@ -41,7 +43,10 @@ def handler(event: dict, context) -> dict:
         if existing:
             conn.close()
             return {"statusCode": 200, "headers": cors, "body": json.dumps({"ok": True, "client": {"id": existing[0], "name": existing[1], "phone": phone}, "message": "Вы уже зарегистрированы"})}
-        cur.execute(f"INSERT INTO {SCHEMA}.clients (name, phone) VALUES ('{name}', '{phone}') RETURNING id")
+        if birthdate:
+            cur.execute(f"INSERT INTO {SCHEMA}.clients (name, phone, birthdate) VALUES ('{name}', '{phone}', '{birthdate}') RETURNING id")
+        else:
+            cur.execute(f"INSERT INTO {SCHEMA}.clients (name, phone) VALUES ('{name}', '{phone}') RETURNING id")
         client_id = cur.fetchone()[0]
         conn.commit()
         conn.close()
