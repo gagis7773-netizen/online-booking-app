@@ -786,11 +786,11 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { defaultLabel: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img", hKey: "section_pricelist_h", nameKey: "section_pricelist_name" },
-            { defaultLabel: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img", hKey: "section_gallery_h", nameKey: "section_gallery_name" },
-            { defaultLabel: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img", hKey: "section_reviews_h", nameKey: "section_reviews_name" },
-            { defaultLabel: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img", hKey: "section_documents_h", nameKey: "section_documents_name" },
-          ].map(item => {
+            { defaultLabel: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img", hKey: "section_pricelist_h", nameKey: "section_pricelist_name", hiddenKey: "section_pricelist_hidden" },
+            { defaultLabel: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img", hKey: "section_gallery_h", nameKey: "section_gallery_name", hiddenKey: "section_gallery_hidden" },
+            { defaultLabel: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img", hKey: "section_reviews_h", nameKey: "section_reviews_name", hiddenKey: "section_reviews_hidden" },
+            { defaultLabel: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img", hKey: "section_documents_h", nameKey: "section_documents_name", hiddenKey: "section_documents_hidden" },
+          ].filter(item => siteSettings[item.hiddenKey] !== "true").map(item => {
             const img = siteSettings[item.imgKey];
             const label = siteSettings[item.nameKey] || item.defaultLabel;
             const h = Number(siteSettings[item.hKey] || siteSettings.section_card_height || 140);
