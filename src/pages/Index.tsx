@@ -5458,14 +5458,27 @@ function AdminSiteSettings() {
   const [uploadingWall, setUploadingWall] = useState(false);
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
-  const load = () => adminPost("site_settings").then(d => { setSettings(d.settings || {}); setLoading(false); });
+  const load = () => adminPost("site_settings").then(d => {
+    const s = d.settings || {};
+    settingsRef.current = s;
+    setSettings(s);
+    setLoading(false);
+  });
   useEffect(() => { load(); }, []);
 
-  const set = (key: string, val: string) => setSettings(p => ({ ...p, [key]: val }));
+  const settingsRef = React.useRef<Record<string, string>>({});
 
-  const saveAll = async () => {
+  const set = (key: string, val: string) => setSettings(p => {
+    const next = { ...p, [key]: val };
+    settingsRef.current = next;
+    return next;
+  });
+
+  // Всегда берём актуальный settings из ref, чтобы не было stale closure
+  const saveAll = async (overrideSettings?: Record<string, string>) => {
+    const toSave = overrideSettings ?? settingsRef.current;
     setSaving(true);
-    await adminPost("site_settings", { action: "save", settings });
+    await adminPost("site_settings", { action: "save", settings: toSave });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
