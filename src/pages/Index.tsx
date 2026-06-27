@@ -3716,6 +3716,7 @@ function AdminGalleryFolders() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [photoSize, setPhotoSize] = useState<"small" | "medium" | "large" | "wide">("medium");
   const [editingSize, setEditingSize] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
   const SIZE_OPTIONS = [
@@ -3755,7 +3756,15 @@ function AdminGalleryFolders() {
   const updatePhotoSize = async (id: number, display_size: string) => {
     await adminPost("gallery", { action: "update_size", id, display_size });
     setEditingSize(null);
+    setMenuOpen(null);
     loadPhotos(activeFolder!.id);
+  };
+
+  const setCoverFromPhoto = async (photoUrl: string) => {
+    await adminPost("gallery_folders", { action: "update", id: activeFolder!.id, name: activeFolder!.name, description: activeFolder!.description || "", cover_url: photoUrl });
+    setActiveFolder((f: any) => ({ ...f, cover_url: photoUrl }));
+    setMenuOpen(null);
+    loadFolders();
   };
 
   const removePhoto = async (id: number) => {
@@ -3838,25 +3847,53 @@ function AdminGalleryFolders() {
               <img src={ph.url} alt={ph.title} className={`w-full ${heightClass} object-cover`} />
               {ph.title && <div className="px-2 py-1.5 text-xs truncate" style={P}>{ph.title}</div>}
 
-              {/* Кнопки управления */}
-              <div className="absolute top-2 right-2 flex gap-1">
-                {/* Изменить размер */}
-                <button onClick={() => setEditingSize(editingSize === ph.id ? null : ph.id)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow"
-                  style={{ background: "rgba(255,255,255,0.92)", color: "hsl(335 60% 45%)" }}
-                  title="Размер">⤢</button>
-                {/* Удалить */}
-                <button onClick={() => removePhoto(ph.id)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow"
-                  style={{ background: "rgba(255,255,255,0.92)", color: "hsl(0 60% 55%)" }}
-                  title="Удалить">✕</button>
-              </div>
+              {/* Кнопка ⋯ */}
+              <button
+                onClick={() => { setMenuOpen(menuOpen === ph.id ? null : ph.id); setEditingSize(null); }}
+                className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center font-bold shadow text-base leading-none"
+                style={{ background: "rgba(255,255,255,0.93)", color: "hsl(335 50% 35%)" }}>
+                ···
+              </button>
+
+              {/* Выпадающее меню */}
+              {menuOpen === ph.id && (
+                <div className="absolute top-10 right-2 rounded-2xl shadow-2xl overflow-hidden z-20 min-w-[160px]"
+                  style={{ background: "white", border: "1px solid hsl(335 40% 88%)" }}>
+
+                  {/* Сделать обложкой */}
+                  <button
+                    onClick={() => setCoverFromPhoto(ph.url)}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm font-medium hover:bg-pink-50 transition-colors border-b"
+                    style={{ color: "hsl(335 60% 40%)", borderColor: "hsl(335 30% 92%)" }}>
+                    <span className="text-base">🖼</span> Сделать обложкой
+                  </button>
+
+                  {/* Изменить размер */}
+                  <button
+                    onClick={() => { setEditingSize(editingSize === ph.id ? null : ph.id); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm font-medium hover:bg-pink-50 transition-colors border-b"
+                    style={{ color: "hsl(335 60% 40%)", borderColor: "hsl(335 30% 92%)" }}>
+                    <span className="text-base">⤢</span> Изменить размер
+                  </button>
+
+                  {/* Удалить */}
+                  <button
+                    onClick={() => { setMenuOpen(null); removePhoto(ph.id); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm font-medium hover:bg-red-50 transition-colors"
+                    style={{ color: "hsl(0 65% 50%)" }}>
+                    <span className="text-base">🗑</span> Удалить фото
+                  </button>
+                </div>
+              )}
 
               {/* Попап смены размера */}
               {editingSize === ph.id && (
-                <div className="absolute inset-x-2 bottom-2 rounded-xl p-2 shadow-xl"
-                  style={{ background: "rgba(255,255,255,0.97)", border: "1px solid hsl(335 50% 85%)" }}>
-                  <div className="text-[10px] font-semibold mb-1.5 text-center" style={PS}>Выбери размер</div>
+                <div className="absolute inset-x-2 bottom-2 rounded-xl p-2.5 shadow-xl z-30"
+                  style={{ background: "rgba(255,255,255,0.98)", border: "1px solid hsl(335 50% 85%)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold" style={PS}>Выбери размер</span>
+                    <button onClick={() => setEditingSize(null)} className="text-xs" style={PS}>✕</button>
+                  </div>
                   <div className="grid grid-cols-4 gap-1">
                     {SIZE_OPTIONS.map(s => (
                       <button key={s.id} onClick={() => updatePhotoSize(ph.id, s.id)}
