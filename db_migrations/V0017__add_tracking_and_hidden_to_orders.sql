@@ -1,0 +1,7 @@
+
+ALTER TABLE t_p3248579_online_booking_app.shop_orders
+  ADD COLUMN IF NOT EXISTS tracking_number VARCHAR(200),
+  ADD COLUMN IF NOT EXISTS tracking_url TEXT,
+  ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP;

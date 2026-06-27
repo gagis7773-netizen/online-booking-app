@@ -650,13 +650,69 @@ def handler(event: dict, context) -> dict:
                 payment_info = {r["key"]: r["value"] for r in cur.fetchall()}
             conn.close(); return resp({"ok": True, "order_id": order_id, "total": total, "payment_info": payment_info})
         if body.get("action") == "update_status":
-            cur.execute(f"UPDATE {SCHEMA}.shop_orders SET status=%s WHERE id=%s", (body.get("status"), body.get("id")))
+            status = body.get("status")
+            order_id = body.get("id")
+            extra_fields = ""
+            extra_vals = []
+            if status == "shipped":
+                extra_fields = ", shipped_at=NOW()"
+                # Отправить SMS клиенту при отправке
+                tracking_number = body.get("tracking_number", "")
+                tracking_url = body.get("tracking_url", "")
+                if tracking_number:
+                    extra_fields += ", tracking_number=%s"
+                    extra_vals.append(tracking_number)
+                if tracking_url:
+                    extra_fields += ", tracking_url=%s"
+                    extra_vals.append(tracking_url)
+                # SMS клиенту
+                cur.execute(f"SELECT client_phone, client_name FROM {SCHEMA}.shop_orders WHERE id=%s", (order_id,))
+                row = cur.fetchone()
+                if row and row["client_phone"]:
+                    track_info = f" Трек: {tracking_number}" if tracking_number else ""
+                    track_link = f" {tracking_url}" if tracking_url else ""
+                    send_sms(row["client_phone"], f"Girly Paradise: ваш заказ №{order_id} отправлен! 🚚{track_info}{track_link} Ожидайте доставку.")
+            elif status == "cancelled":
+                extra_fields = ", cancelled_at=NOW()"
+                cur.execute(f"SELECT client_phone FROM {SCHEMA}.shop_orders WHERE id=%s", (order_id,))
+                row = cur.fetchone()
+                if row and row["client_phone"]:
+                    send_sms(row["client_phone"], f"Girly Paradise: заказ №{order_id} отменён. Если есть вопросы — позвоните нам.")
+            elif status == "confirmed":
+                cur.execute(f"SELECT client_phone FROM {SCHEMA}.shop_orders WHERE id=%s", (order_id,))
+                row = cur.fetchone()
+                if row and row["client_phone"]:
+                    send_sms(row["client_phone"], f"Girly Paradise: заказ №{order_id} подтверждён! ✅ Скоро приступим к сборке и отправке.")
+            cur.execute(f"UPDATE {SCHEMA}.shop_orders SET status=%s{extra_fields} WHERE id=%s",
+                        [status] + extra_vals + [order_id])
             conn.commit(); conn.close(); return resp({"ok": True})
+
+        if body.get("action") == "hide":
+            cur.execute(f"UPDATE {SCHEMA}.shop_orders SET is_hidden=true WHERE id=%s", (body.get("id"),))
+            conn.commit(); conn.close(); return resp({"ok": True})
+
+        if body.get("action") == "client_orders":
+            client_id = body.get("client_id")
+            if not client_id:
+                conn.close(); return resp({"orders": []})
+            cur.execute(f"""
+                SELECT * FROM {SCHEMA}.shop_orders
+                WHERE client_id=%s AND (is_hidden IS NULL OR is_hidden=false)
+                ORDER BY created_at DESC LIMIT 50
+            """, (client_id,))
+            orders = [dict(r) for r in cur.fetchall()]
+            for o in orders:
+                cur.execute(f"SELECT * FROM {SCHEMA}.shop_order_items WHERE order_id=%s", (o["id"],))
+                o["items"] = [dict(r) for r in cur.fetchall()]
+            conn.close(); return resp({"orders": orders})
+
         status_filter = body.get("status")
+        show_hidden = body.get("show_hidden", False)
         if status_filter:
-            cur.execute(f"SELECT * FROM {SCHEMA}.shop_orders WHERE status=%s ORDER BY created_at DESC LIMIT 100", (status_filter,))
+            cur.execute(f"SELECT * FROM {SCHEMA}.shop_orders WHERE status=%s AND (is_hidden IS NULL OR is_hidden=false) ORDER BY created_at DESC LIMIT 100", (status_filter,))
         else:
-            cur.execute(f"SELECT * FROM {SCHEMA}.shop_orders ORDER BY created_at DESC LIMIT 100")
+            hidden_clause = "" if show_hidden else "WHERE (is_hidden IS NULL OR is_hidden=false)"
+            cur.execute(f"SELECT * FROM {SCHEMA}.shop_orders {hidden_clause} ORDER BY created_at DESC LIMIT 100")
         orders = [dict(r) for r in cur.fetchall()]
         for o in orders:
             cur.execute(f"SELECT * FROM {SCHEMA}.shop_order_items WHERE order_id=%s", (o["id"],))

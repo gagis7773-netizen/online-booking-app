@@ -1429,7 +1429,10 @@ function ProfilePage({ client, onLogin, onLogout, setPage }: { client: any; onLo
 function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout: () => void; setPage: (p: Page) => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const [tab, setTab] = useState<"upcoming" | "done">("upcoming");
+  const [tab, setTab] = useState<"upcoming" | "done" | "orders">("upcoming");
+  const [shopOrders, setShopOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [cancellingOrder, setCancellingOrder] = useState<number | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>(localStorage.getItem("gp_avatar_" + client.id) || "");
   const [showShare, setShowShare] = useState(false);
@@ -1439,6 +1442,14 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
   const [soundOn, setSoundOn] = useState(isClientSoundEnabled());
   const siteUrl = window.location.href;
 
+  const loadShopOrders = () => {
+    if (!client?.id) return;
+    setLoadingOrders(true);
+    adminPost("shop_orders", { action: "client_orders", client_id: client.id })
+      .then(d => { setShopOrders(d.orders || []); setLoadingOrders(false); })
+      .catch(() => setLoadingOrders(false));
+  };
+
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("gp_bookings_" + client.id) || "[]");
     setBookings(stored);
@@ -1447,6 +1458,11 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, [client.id]);
+
+  // Подгружаем заказы магазина при переключении на вкладку
+  useEffect(() => {
+    if (tab === "orders" && shopOrders.length === 0) loadShopOrders();
+  }, [tab]);
 
   const filtered = bookings.filter((b: any) => b.status === tab);
 
@@ -1654,61 +1670,182 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
           </div>
         )}
 
-        {/* История посещений */}
-        <h3 className="text-lg font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>История посещений</h3>
-
-        <div className="flex rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
-          <button onClick={() => setTab("upcoming")} className="flex-1 py-2.5 text-sm font-medium transition-all"
+        {/* Табы: История + Заказы */}
+        <div className="grid grid-cols-3 gap-0.5 rounded-2xl overflow-hidden mb-4" style={{ background: "hsl(335 30% 92%)" }}>
+          <button onClick={() => setTab("upcoming")} className="py-2.5 text-xs font-semibold transition-all"
             style={tab === "upcoming" ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" } : { color: "hsl(335 40% 60%)" }}>
             Предстоящие
           </button>
-          <button onClick={() => setTab("done")} className="flex-1 py-2.5 text-sm font-medium transition-all"
+          <button onClick={() => setTab("done")} className="py-2.5 text-xs font-semibold transition-all"
             style={tab === "done" ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" } : { color: "hsl(335 40% 60%)" }}>
             Были у нас
           </button>
+          <button onClick={() => setTab("orders")} className="py-2.5 text-xs font-semibold transition-all relative"
+            style={tab === "orders" ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            Заказы 🛍
+            {shopOrders.some((o: any) => o.status === "shipped") && tab !== "orders" && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-orange-400" />
+            )}
+          </button>
         </div>
 
-        <div className="space-y-3 pb-4">
-          {loadingHistory && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
-          {!loadingHistory && filtered.length === 0 && (
-            <div className="text-center py-10">
-              <div className="text-4xl mb-3">✨</div>
-              <p className="font-medium mb-1" style={{ color: "hsl(335 50% 40%)" }}>
-                {tab === "upcoming" ? "Нет предстоящих записей" : "История пока пуста"}
-              </p>
-              <p className="text-sm mb-4" style={{ color: "hsl(335 30% 60%)" }}>
-                {tab === "upcoming" ? "Запишись на процедуру прямо сейчас!" : "Запишись на первую процедуру!"}
-              </p>
-              <button onClick={() => setPage("booking")}
-                className="px-5 py-2.5 rounded-xl font-semibold text-white text-sm"
-                style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
-                Записаться
-              </button>
-            </div>
-          )}
-          {filtered.map((b: any, i: number) => (
-            <div key={b.id} className="card-glow rounded-2xl p-4 animate-slide-up" style={{ animationDelay: `${i * 0.08}s` }}>
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex-1">
-                  <div className="font-semibold text-sm leading-tight" style={{ color: "hsl(335 50% 30%)" }}>
-                    {Array.isArray(b.services) ? b.services.join(", ") : (b.service || "Процедура")}
+        {/* История посещений */}
+        {(tab === "upcoming" || tab === "done") && (
+          <div className="space-y-3 pb-4">
+            {loadingHistory && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+            {!loadingHistory && filtered.length === 0 && (
+              <div className="text-center py-10">
+                <div className="text-4xl mb-3">✨</div>
+                <p className="font-medium mb-1" style={{ color: "hsl(335 50% 40%)" }}>
+                  {tab === "upcoming" ? "Нет предстоящих записей" : "История пока пуста"}
+                </p>
+                <p className="text-sm mb-4" style={{ color: "hsl(335 30% 60%)" }}>
+                  {tab === "upcoming" ? "Запишись на процедуру прямо сейчас!" : "Запишись на первую процедуру!"}
+                </p>
+                <button onClick={() => setPage("booking")}
+                  className="px-5 py-2.5 rounded-xl font-semibold text-white text-sm"
+                  style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+                  Записаться
+                </button>
+              </div>
+            )}
+            {filtered.map((b: any, i: number) => (
+              <div key={b.id} className="card-glow rounded-2xl p-4 animate-slide-up" style={{ animationDelay: `${i * 0.08}s` }}>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm leading-tight" style={{ color: "hsl(335 50% 30%)" }}>
+                      {Array.isArray(b.services) ? b.services.join(", ") : (b.service || "Процедура")}
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: "hsl(335 30% 60%)" }}>{b.master || "Галина Сиплатова"}</div>
                   </div>
-                  <div className="text-xs mt-0.5" style={{ color: "hsl(335 30% 60%)" }}>{b.master || "Галина Сиплатова"}</div>
+                  <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+                    style={b.status === "upcoming"
+                      ? { background: "hsl(335 80% 60% / 0.12)", color: "hsl(335 80% 50%)", border: "1px solid hsl(335 80% 80%)" }
+                      : { background: "hsl(335 20% 93%)", color: "hsl(335 30% 65%)" }}>
+                    {b.status === "upcoming" ? "Скоро" : "Были"}
+                  </span>
                 </div>
-                <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
-                  style={b.status === "upcoming"
-                    ? { background: "hsl(335 80% 60% / 0.12)", color: "hsl(335 80% 50%)", border: "1px solid hsl(335 80% 80%)" }
-                    : { background: "hsl(335 20% 93%)", color: "hsl(335 30% 65%)" }}>
-                  {b.status === "upcoming" ? "Скоро" : "Были"}
-                </span>
+                <div className="flex items-center gap-3 text-xs" style={{ color: "hsl(335 30% 60%)" }}>
+                  <span className="flex items-center gap-1"><Icon name="Calendar" size={11} />{b.day}</span>
+                  <span className="flex items-center gap-1"><Icon name="Clock" size={11} />{b.time}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs" style={{ color: "hsl(335 30% 60%)" }}>
-                <span className="flex items-center gap-1"><Icon name="Calendar" size={11} />{b.day}</span>
-                <span className="flex items-center gap-1"><Icon name="Clock" size={11} />{b.time}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Заказы из магазина */}
+        {tab === "orders" && (
+          <div className="space-y-3 pb-4">
+            <button onClick={loadShopOrders} className="flex items-center gap-1.5 text-xs mb-2" style={{ color: "hsl(335 60% 55%)" }}>
+              <Icon name="RefreshCw" size={12} /> Обновить
+            </button>
+            {loadingOrders && <div className="text-center py-8"><div className="text-3xl animate-float">🌸</div></div>}
+            {!loadingOrders && shopOrders.length === 0 && (
+              <div className="text-center py-10">
+                <div className="text-4xl mb-3">🛍</div>
+                <p className="font-medium mb-1" style={{ color: "hsl(335 50% 40%)" }}>Заказов пока нет</p>
+                <button onClick={() => setPage("shop")}
+                  className="mt-3 px-5 py-2.5 rounded-xl font-semibold text-white text-sm"
+                  style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
+                  В магазин
+                </button>
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+            {shopOrders.map((o: any) => {
+              const STATUS_LABELS: Record<string, string> = {
+                new: "🆕 Новый", confirmed: "✅ Подтверждён",
+                shipped: "🚚 В пути", done: "✔ Получен", cancelled: "❌ Отменён",
+              };
+              const STATUS_BG: Record<string, string> = {
+                new: "hsl(200 80% 95%)", confirmed: "hsl(142 60% 94%)",
+                shipped: "hsl(30 80% 95%)", done: "hsl(142 60% 94%)", cancelled: "hsl(0 60% 96%)",
+              };
+              const STATUS_COLOR: Record<string, string> = {
+                new: "hsl(200 70% 40%)", confirmed: "hsl(142 60% 35%)",
+                shipped: "hsl(30 70% 40%)", done: "hsl(142 60% 30%)", cancelled: "hsl(0 60% 50%)",
+              };
+              return (
+                <div key={o.id} className="card-glow rounded-2xl p-4">
+                  {/* Шапка заказа */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="font-semibold text-sm" style={{ color: "hsl(335 50% 28%)" }}>
+                        Заказ #{o.id}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: "hsl(335 30% 58%)" }}>
+                        {new Date(o.created_at).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" })}
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                      style={{ background: STATUS_BG[o.status] || "hsl(335 20% 95%)", color: STATUS_COLOR[o.status] || "hsl(335 40% 55%)" }}>
+                      {STATUS_LABELS[o.status] || o.status}
+                    </span>
+                  </div>
+
+                  {/* Товары */}
+                  <div className="space-y-1 mb-3">
+                    {(o.items || []).map((it: any) => (
+                      <div key={it.id} className="flex justify-between text-xs" style={{ color: "hsl(335 30% 58%)" }}>
+                        <span>{it.product_name} × {it.quantity}</span>
+                        <span className="font-medium">{(it.price * it.quantity).toLocaleString()} ₽</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Итого */}
+                  <div className="flex justify-between items-center mb-3 pt-2 border-t" style={{ borderColor: "hsl(335 40% 92%)" }}>
+                    <span className="text-xs" style={{ color: "hsl(335 30% 58%)" }}>
+                      {o.delivery_type?.toUpperCase()} · {o.pickup_point || o.delivery_address}
+                    </span>
+                    <span className="font-oswald font-bold text-sm" style={{ color: "hsl(335 80% 55%)" }}>
+                      {Number(o.total_amount).toLocaleString()} ₽
+                    </span>
+                  </div>
+
+                  {/* Отслеживание (если есть трек-номер) */}
+                  {o.status === "shipped" && (
+                    <div className="rounded-xl p-3 mb-3" style={{ background: "hsl(30 80% 97%)", border: "1px solid hsl(30 60% 88%)" }}>
+                      <div className="text-xs font-semibold mb-1" style={{ color: "hsl(30 70% 40%)" }}>
+                        🚚 Заказ отправлен!
+                      </div>
+                      {o.tracking_number && (
+                        <div className="text-xs" style={{ color: "hsl(30 60% 40%)" }}>
+                          Трек-номер: <strong>{o.tracking_number}</strong>
+                        </div>
+                      )}
+                      {o.tracking_url && (
+                        <a href={o.tracking_url} target="_blank" rel="noopener noreferrer"
+                          className="mt-2 flex items-center gap-1.5 text-xs font-medium"
+                          style={{ color: "hsl(200 70% 45%)" }}>
+                          <Icon name="ExternalLink" size={12} />
+                          Отследить посылку
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Кнопка отмены */}
+                  {(o.status === "new" || o.status === "confirmed") && (
+                    <button
+                      disabled={cancellingOrder === o.id}
+                      onClick={async () => {
+                        if (!window.confirm("Отменить заказ?")) return;
+                        setCancellingOrder(o.id);
+                        await adminPost("shop_orders", { action: "update_status", id: o.id, status: "cancelled" });
+                        setCancellingOrder(null);
+                        loadShopOrders();
+                      }}
+                      className="w-full py-2.5 rounded-xl text-xs font-medium"
+                      style={{ background: "hsl(0 60% 96%)", color: "hsl(0 60% 50%)", border: "1px solid hsl(0 50% 88%)" }}>
+                      {cancellingOrder === o.id ? "Отменяем..." : "❌ Отменить заказ"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -5983,6 +6120,9 @@ function AdminShopOrders() {
   const [loading, setLoading] = React.useState(true);
   const [filter, setFilter] = React.useState("");
   const [expanded, setExpanded] = React.useState<number | null>(null);
+  const [trackingInputs, setTrackingInputs] = React.useState<Record<number, string>>({});
+  const [trackingUrlInputs, setTrackingUrlInputs] = React.useState<Record<number, string>>({});
+  const [sending, setSending] = React.useState<number | null>(null);
 
   const prevOrderCount = React.useRef<number>(0);
   const load = () => adminPost("shop_orders", filter ? { status: filter } : {}).then(d => {
@@ -6002,9 +6142,23 @@ function AdminShopOrders() {
 
   const STATUS_LABELS: Record<string, string> = { new: "🆕 Новый", confirmed: "✅ Подтверждён", shipped: "🚚 Отправлен", done: "✔ Выдан", cancelled: "❌ Отменён" };
   const STATUS_COLORS: Record<string, string> = { new: "hsl(200 80% 50%)", confirmed: "hsl(142 60% 40%)", shipped: "hsl(30 80% 50%)", done: "hsl(142 60% 35%)", cancelled: "hsl(0 60% 50%)" };
+  const inp = { background: "white", border: "1px solid hsl(335 50% 85%)", color: "hsl(335 50% 30%)" };
 
-  const updateStatus = async (id: number, status: string) => {
-    await adminPost("shop_orders", { action: "update_status", id, status });
+  const updateStatus = async (id: number, status: string, extra?: object) => {
+    await adminPost("shop_orders", { action: "update_status", id, status, ...extra });
+    load();
+  };
+
+  const shipOrder = async (o: any) => {
+    setSending(o.id);
+    const tracking_number = trackingInputs[o.id] || "";
+    const tracking_url = trackingUrlInputs[o.id] || "";
+    await updateStatus(o.id, "shipped", { tracking_number, tracking_url });
+    setSending(null);
+  };
+
+  const hideOrder = async (id: number) => {
+    await adminPost("shop_orders", { action: "hide", id });
     load();
   };
 
@@ -6012,7 +6166,7 @@ function AdminShopOrders() {
     <div className="px-4 pb-6">
       {/* Фильтр */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide pb-1">
-        {[{ v: "", l: "Все" }, { v: "new", l: "Новые" }, { v: "confirmed", l: "Подтвержд." }, { v: "shipped", l: "В пути" }, { v: "done", l: "Выданы" }].map(f => (
+        {[{ v: "", l: "Все" }, { v: "new", l: "Новые" }, { v: "confirmed", l: "Подтвержд." }, { v: "shipped", l: "В пути" }, { v: "done", l: "Выданы" }, { v: "cancelled", l: "Отменены" }].map(f => (
           <button key={f.v} onClick={() => setFilter(f.v)}
             className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold"
             style={filter === f.v ? { ...GRAD, color: "white" } : { background: "white", color: "hsl(335 50% 55%)", border: "1px solid hsl(335 50% 85%)" }}>
@@ -6030,6 +6184,11 @@ function AdminShopOrders() {
                   <div className="font-semibold text-sm" style={P}>Заказ #{o.id}</div>
                   <div className="text-xs mt-0.5" style={PS}>{o.client_name} · {o.client_phone}</div>
                   <div className="text-xs mt-0.5" style={PS}>{o.delivery_type?.toUpperCase()}: {o.pickup_point || o.delivery_address}</div>
+                  {o.tracking_number && (
+                    <div className="text-xs mt-0.5 font-medium" style={{ color: "hsl(30 80% 45%)" }}>
+                      📦 Трек: {o.tracking_number}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="font-oswald font-bold text-sm" style={{ color: "hsl(335 80% 55%)" }}>{Number(o.total_amount).toLocaleString()} ₽</div>
@@ -6039,7 +6198,7 @@ function AdminShopOrders() {
             </button>
             {expanded === o.id && (
               <div className="px-4 pb-4 border-t" style={{ borderColor: "hsl(335 40% 90%)" }}>
-                <div className="mt-3 space-y-1.5 mb-3">
+                <div className="mt-3 space-y-1.5 mb-2">
                   {(o.items || []).map((it: any) => (
                     <div key={it.id} className="flex justify-between text-xs" style={PS}>
                       <span>{it.product_name} × {it.quantity}</span>
@@ -6047,15 +6206,82 @@ function AdminShopOrders() {
                     </div>
                   ))}
                 </div>
-                <div className="text-xs mb-3" style={PS}>{new Date(o.created_at).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(STATUS_LABELS).map(([st, lbl]) => (
-                    <button key={st} onClick={() => updateStatus(o.id, st)}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium"
-                      style={o.status === st ? { background: STATUS_COLORS[st], color: "white" } : { background: "hsl(335 20% 95%)", color: "hsl(335 40% 55%)" }}>
-                      {lbl}
+                <div className="text-xs mb-2" style={PS}>
+                  {new Date(o.created_at).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {o.comment && <> · {o.comment}</>}
+                </div>
+
+                {/* Кнопки быстрых действий */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {/* Отправить заказ */}
+                  {o.status !== "shipped" && o.status !== "done" && o.status !== "cancelled" && (
+                    <div className="col-span-2 space-y-2 p-3 rounded-xl" style={{ background: "hsl(30 80% 97%)", border: "1px solid hsl(30 60% 88%)" }}>
+                      <div className="text-xs font-semibold" style={{ color: "hsl(30 70% 40%)" }}>🚚 Отправить заказ</div>
+                      <input
+                        value={trackingInputs[o.id] || ""}
+                        onChange={e => setTrackingInputs(p => ({ ...p, [o.id]: e.target.value }))}
+                        placeholder="Трек-номер (необязательно)"
+                        className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={inp} />
+                      <input
+                        value={trackingUrlInputs[o.id] || ""}
+                        onChange={e => setTrackingUrlInputs(p => ({ ...p, [o.id]: e.target.value }))}
+                        placeholder="Ссылка для отслеживания (необязательно)"
+                        className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={inp} />
+                      <button onClick={() => shipOrder(o)} disabled={sending === o.id}
+                        className="w-full py-2.5 rounded-xl text-xs font-bold text-white"
+                        style={{ background: "hsl(30 80% 50%)" }}>
+                        {sending === o.id ? "Отправляем..." : "🚚 Отметить как отправлен + SMS клиенту"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Подтвердить */}
+                  {o.status === "new" && (
+                    <button onClick={() => updateStatus(o.id, "confirmed")}
+                      className="py-2.5 rounded-xl text-xs font-bold text-white"
+                      style={{ background: "hsl(142 60% 40%)" }}>
+                      ✅ Подтвердить
                     </button>
-                  ))}
+                  )}
+
+                  {/* Выдан */}
+                  {o.status === "shipped" && (
+                    <button onClick={() => updateStatus(o.id, "done")}
+                      className="py-2.5 rounded-xl text-xs font-bold text-white"
+                      style={{ background: "hsl(142 60% 35%)" }}>
+                      ✔ Отметить выданным
+                    </button>
+                  )}
+
+                  {/* Отменить */}
+                  {o.status !== "done" && o.status !== "cancelled" && (
+                    <button onClick={() => updateStatus(o.id, "cancelled")}
+                      className="py-2.5 rounded-xl text-xs font-medium"
+                      style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 50%)" }}>
+                      ❌ Отменить заказ
+                    </button>
+                  )}
+
+                  {/* Удалить из списка */}
+                  <button onClick={() => hideOrder(o.id)}
+                    className="py-2.5 rounded-xl text-xs font-medium"
+                    style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
+                    🗑 Убрать из списка
+                  </button>
+                </div>
+
+                {/* Все статусы */}
+                <div className="pt-2 border-t" style={{ borderColor: "hsl(335 30% 92%)" }}>
+                  <div className="text-[10px] mb-1.5" style={PS}>Все статусы:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(STATUS_LABELS).map(([st, lbl]) => (
+                      <button key={st} onClick={() => updateStatus(o.id, st)}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                        style={o.status === st ? { background: STATUS_COLORS[st], color: "white" } : { background: "hsl(335 20% 95%)", color: "hsl(335 40% 55%)" }}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
