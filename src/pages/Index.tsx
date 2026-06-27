@@ -4882,7 +4882,9 @@ function ClientGalleryPage({ setPage, onBack }: { setPage: (p: Page) => void; on
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [photosLoading, setPhotosLoading] = useState(false);
-  const [fullscreen, setFullscreen] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState<{ url: string; id: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState<number | null>(null);
 
   useEffect(() => {
     adminPost("gallery_folders").then(d => { setFolders(d.folders || []); setLoading(false); });
@@ -4893,10 +4895,29 @@ function ClientGalleryPage({ setPage, onBack }: { setPage: (p: Page) => void; on
     adminPost("gallery", { folder_id: f.id }).then(d => { setPhotos(d.gallery || []); setPhotosLoading(false); });
   };
 
+  const removePhoto = async (id: number) => {
+    setDeleting(true);
+    await adminPost("gallery", { action: "deactivate", id });
+    setPhotos(prev => prev.filter(p => p.id !== id));
+    setFullscreen(null);
+    setMenuOpen(null);
+    setDeleting(false);
+  };
+
   if (fullscreen) return (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setFullscreen(null)}>
-      <img src={fullscreen} className="max-w-full max-h-full object-contain" alt="фото" />
-      <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-xl">✕</button>
+      <img src={fullscreen.url} className="max-w-full max-h-full object-contain" alt="фото" />
+      {/* Закрыть */}
+      <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-xl"
+        onClick={() => setFullscreen(null)}>✕</button>
+      {/* Удалить */}
+      <button
+        onClick={e => { e.stopPropagation(); if (confirm("Удалить это фото?")) removePhoto(fullscreen.id); }}
+        disabled={deleting}
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold text-sm"
+        style={{ background: "rgba(220,38,38,0.85)", color: "white", backdropFilter: "blur(8px)" }}>
+        🗑 {deleting ? "Удаляем..." : "Удалить фото"}
+      </button>
     </div>
   );
 
@@ -4960,11 +4981,38 @@ function ClientGalleryPage({ setPage, onBack }: { setPage: (p: Page) => void; on
               const colSpan = size === "large" || size === "wide" ? "col-span-2" : "col-span-1";
               const heightClass = size === "small" ? "h-24" : size === "large" ? "h-64" : size === "wide" ? "h-36" : "h-36";
               return (
-                <button key={ph.id} onClick={() => setFullscreen(ph.url)}
-                  className={`rounded-2xl overflow-hidden hover:scale-[1.02] transition-all ${colSpan}`}>
-                  <img src={ph.url} alt={ph.title} className={`w-full ${heightClass} object-cover`} />
-                  {ph.title && <div className="px-2 py-1.5 text-xs text-left" style={{ background: "hsl(335 80% 98%)", color: "hsl(335 50% 30%)" }}>{ph.title}</div>}
-                </button>
+                <div key={ph.id} className={`rounded-2xl overflow-hidden relative group ${colSpan}`}>
+                  <button onClick={() => setFullscreen({ url: ph.url, id: ph.id })}
+                    className="w-full hover:scale-[1.02] transition-all block">
+                    <img src={ph.url} alt={ph.title} className={`w-full ${heightClass} object-cover`} />
+                    {ph.title && <div className="px-2 py-1.5 text-xs text-left" style={{ background: "hsl(335 80% 98%)", color: "hsl(335 50% 30%)" }}>{ph.title}</div>}
+                  </button>
+                  {/* Кнопка удаления на фото (три точки) */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === ph.id ? null : ph.id); }}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center font-bold shadow text-base leading-none"
+                    style={{ background: "rgba(255,255,255,0.93)", color: "hsl(335 50% 35%)" }}>
+                    ···
+                  </button>
+                  {menuOpen === ph.id && (
+                    <div className="absolute top-10 right-2 rounded-2xl shadow-2xl overflow-hidden z-20 min-w-[140px]"
+                      style={{ background: "white", border: "1px solid hsl(335 40% 88%)" }}>
+                      <button
+                        onClick={() => { setFullscreen({ url: ph.url, id: ph.id }); setMenuOpen(null); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm font-medium hover:bg-pink-50 transition-colors border-b"
+                        style={{ color: "hsl(335 60% 40%)", borderColor: "hsl(335 30% 92%)" }}>
+                        <span>🔍</span> Открыть
+                      </button>
+                      <button
+                        onClick={() => { if (confirm("Удалить это фото?")) removePhoto(ph.id); }}
+                        disabled={deleting}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm font-medium hover:bg-red-50 transition-colors"
+                        style={{ color: "hsl(0 65% 50%)" }}>
+                        <span>🗑</span> Удалить
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
