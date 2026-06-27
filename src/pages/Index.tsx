@@ -1944,11 +1944,11 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
             {rescheduleBooking && (
               <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
                 onClick={() => setRescheduleBooking(null)}>
-                <div className="w-full max-w-md rounded-t-3xl pb-8 overflow-y-auto" style={{ background: "white", maxHeight: "90vh" }}
+                <div className="w-full max-w-md rounded-t-3xl flex flex-col" style={{ background: "white", maxHeight: "90vh" }}
                   onClick={e => e.stopPropagation()}>
 
                   {/* Шапка */}
-                  <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: "hsl(335 30% 92%)" }}>
+                  <div className="px-5 pt-5 pb-3 border-b flex-shrink-0" style={{ borderColor: "hsl(335 30% 92%)" }}>
                     <div className="flex items-center justify-between mb-1">
                       <div className="text-base font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Перенести запись</div>
                       <button onClick={() => setRescheduleBooking(null)} className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -1961,7 +1961,8 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
                     </div>
                   </div>
 
-                  <div className="px-5 pt-4">
+                  {/* Скроллируемое содержимое */}
+                  <div className="px-5 pt-4 overflow-y-auto flex-1">
                     {/* Выбор дня */}
                     <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "hsl(335 40% 60%)" }}>Выбери день</p>
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-4">
@@ -2022,9 +2023,12 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
                       );
                     })()}
 
-                    {/* Итог + кнопка */}
+                  </div>
+
+                  {/* Кнопки — всегда видны внизу */}
+                  <div className="px-5 pb-6 pt-3 flex-shrink-0 border-t" style={{ borderColor: "hsl(335 30% 92%)" }}>
                     {rescheduleDate && rescheduleTime && (
-                      <div className="card-glow rounded-2xl p-3 mb-4 flex items-center gap-3">
+                      <div className="card-glow rounded-2xl p-3 mb-3 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                           style={{ background: "hsl(335 80% 60% / 0.12)" }}>
                           <Icon name="CalendarCheck" size={18} style={{ color: "hsl(335 80% 55%)" }} />
@@ -2037,20 +2041,19 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
                         </div>
                       </div>
                     )}
-
                     <div className="flex gap-2">
                       <button onClick={() => setRescheduleBooking(null)}
-                        className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                        className="flex-1 py-3.5 rounded-2xl text-sm font-semibold"
                         style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
                         Отмена
                       </button>
                       <button onClick={doReschedule}
                         disabled={!rescheduleDate || !rescheduleTime || rescheduling}
-                        className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all"
+                        className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white transition-all"
                         style={rescheduleDate && rescheduleTime
-                          ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }
+                          ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 14px hsl(335 80% 65% / 0.4)" }
                           : { background: "hsl(335 20% 85%)", color: "hsl(335 20% 65%)" }}>
-                        {rescheduling ? "Переносим..." : "Перенести"}
+                        {rescheduling ? "Переносим..." : "✓ Перенести"}
                       </button>
                     </div>
                   </div>
