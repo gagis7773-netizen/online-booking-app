@@ -2175,8 +2175,6 @@ function AdminPage({ onBack }: { onBack: () => void }) {
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
     { id: "shop_admin", icon: "ShoppingBag", label: "Магазин", color: "from-pink-500 to-rose-400", ownerOnly: true },
     { id: "site_settings", icon: "Paintbrush", label: "Оформление", color: "from-fuchsia-500 to-pink-500", ownerOnly: true },
-    { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
-    { id: "sections_editor", icon: "LayoutDashboard", label: "Разделы сайта", color: "from-teal-500 to-cyan-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
   ];
 
@@ -5512,7 +5510,12 @@ function AdminSiteSettings() {
               <div className="flex items-center gap-3">
                 {/* Тоггл вкл/выкл */}
                 <button
-                  onClick={() => { set(`section_${f.key}_hidden`, settings[`section_${f.key}_hidden`] === "true" ? "false" : "true"); saveAll(); }}
+                  onClick={() => {
+                    const newVal = settings[`section_${f.key}_hidden`] === "true" ? "false" : "true";
+                    const newSettings = { ...settings, [`section_${f.key}_hidden`]: newVal };
+                    setSettings(newSettings);
+                    adminPost("site_settings", { action: "save", settings: newSettings });
+                  }}
                   className="w-11 h-6 rounded-full transition-all relative flex-shrink-0"
                   style={{ background: settings[`section_${f.key}_hidden`] === "true" ? "hsl(335 20% 82%)" : "hsl(335 80% 58%)" }}>
                   <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
@@ -5551,12 +5554,6 @@ function AdminSiteSettings() {
               )}
             </div>
           ))}
-
-          {/* Вкл/выкл разделы сайта (AdminSectionsEditor встроен) */}
-          <div className="card-glow rounded-2xl p-4">
-            <div className="font-semibold text-sm mb-3" style={P}>Дополнительные разделы</div>
-            <AdminSectionsEditor />
-          </div>
 
           <button onClick={saveAll} disabled={saving} className="w-full py-3 rounded-2xl font-semibold text-white text-sm" style={GRAD}>
             {saving ? "Сохраняем..." : "💾 Сохранить разделы"}
