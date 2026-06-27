@@ -124,11 +124,11 @@ def handler(event: dict, context) -> dict:
         if body.get("action") == "add":
             cur.execute(f"""
                 INSERT INTO {SCHEMA}.schedule
-                (client_name, client_phone, services, master, booking_date, booking_time, status, notes)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                (client_name, client_phone, services, master, booking_date, booking_time, status, notes, duration)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
             """, (body.get("client_name",""), body.get("client_phone",""), body.get("services",""),
                   body.get("master","Галина"), body.get("booking_date",""), body.get("booking_time",""),
-                  body.get("status","confirmed"), body.get("notes","")))
+                  body.get("status","confirmed"), body.get("notes",""), body.get("duration","")))
             row_id = cur.fetchone()["id"]
             conn.commit(); conn.close()
             return resp({"ok": True, "id": row_id})

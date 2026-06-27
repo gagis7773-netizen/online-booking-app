@@ -3012,8 +3012,12 @@ function AdminSchedule() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "" });
+  const [form, setForm] = useState({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "", duration: "" });
   const [saving, setSaving] = useState(false);
+  // Прайс-лист для выбора услуг
+  const [priceItems, setPriceItems] = useState<any[]>([]);
+  const [selectedSvcs, setSelectedSvcs] = useState<any[]>([]);
+  const [showSvcPicker, setShowSvcPicker] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -3026,6 +3030,20 @@ function AdminSchedule() {
   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = () => adminPost("schedule").then(d => { setItems(d.schedule || []); setLoading(false); });
+  useEffect(() => {
+    adminPost("pricelist_custom", { active_only: true }).then(d => { setPriceItems(d.items || []); });
+  }, []);
+
+  const toggleSvc = (item: any) => {
+    setSelectedSvcs(prev => {
+      const has = prev.find((s: any) => s.id === item.id);
+      const next = has ? prev.filter((s: any) => s.id !== item.id) : [...prev, item];
+      // Автосумма длительности
+      const totalDur = next.reduce((acc: number, s: any) => acc + (parseInt(s.duration) || 0), 0);
+      if (totalDur > 0) setForm(f => ({ ...f, duration: String(totalDur) }));
+      return next;
+    });
+  };
   const loadWork = () => {
     adminPost("work_schedule").then(d => {
       const sorted = (d.days || []).sort((a: any, b: any) => ((a.day_of_week + 6) % 7) - ((b.day_of_week + 6) % 7));
@@ -3052,8 +3070,12 @@ function AdminSchedule() {
   const save = async () => {
     if (!form.client_name || !form.booking_date || !form.booking_time) return;
     setSaving(true);
-    await adminPost("schedule", { action: "add", ...form });
-    setForm({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "" });
+    const servicesStr = selectedSvcs.length > 0
+      ? selectedSvcs.map((s: any) => s.name).join(", ")
+      : form.services;
+    await adminPost("schedule", { action: "add", ...form, services: servicesStr });
+    setForm({ client_name: "", client_phone: "", services: "", master: "Галина", booking_date: "", booking_time: "", notes: "", duration: "" });
+    setSelectedSvcs([]); setShowSvcPicker(false);
     setAdding(false); setSaving(false); load();
   };
   const del = async (id: number) => { await adminPost("schedule", { action: "delete", id }); load(); };
@@ -3318,10 +3340,99 @@ function AdminSchedule() {
                 <label className="text-xs font-medium block mb-1" style={PS}>Телефон</label>
                 <input value={form.client_phone} onChange={e => setForm(p => ({ ...p, client_phone: e.target.value }))} placeholder="+7..." type="tel" autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
               </div>
+              {/* Выбор услуг из прайса */}
               <div>
                 <label className="text-xs font-medium block mb-1" style={PS}>Услуги</label>
-                <input value={form.services} onChange={e => setForm(p => ({ ...p, services: e.target.value }))} placeholder="Криолиполиз, СМАС..." autoComplete="off" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+                {/* Выбранные услуги */}
+                {selectedSvcs.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedSvcs.map((s: any) => (
+                      <span key={s.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                        style={{ ...GRAD, color: "white" }}>
+                        {s.name}
+                        <button type="button" onClick={() => toggleSvc(s)} className="ml-0.5 opacity-75 hover:opacity-100">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <button type="button" onClick={() => setShowSvcPicker(!showSvcPicker)}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm text-left flex items-center justify-between"
+                  style={inp}>
+                  <span style={selectedSvcs.length === 0 ? { color: "hsl(335 20% 70%)" } : P}>
+                    {selectedSvcs.length === 0 ? "Выбрать из прайса..." : `Ещё добавить...`}
+                  </span>
+                  <Icon name={showSvcPicker ? "ChevronUp" : "ChevronDown"} size={14} style={PS} />
+                </button>
+
+                {/* Пикер услуг */}
+                {showSvcPicker && (
+                  <div className="mt-2 rounded-2xl overflow-hidden border max-h-56 overflow-y-auto" style={{ borderColor: "hsl(335 50% 85%)" }}>
+                    {priceItems.length === 0 && (
+                      <div className="px-3 py-4 text-xs text-center" style={PS}>Прайс пустой — добавьте услуги в разделе «Прайс»</div>
+                    )}
+                    {(() => {
+                      const grouped: Record<string, any[]> = {};
+                      priceItems.forEach((it: any) => {
+                        const cat = it.category || "Другое";
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(it);
+                      });
+                      return Object.entries(grouped).map(([cat, catItems]) => (
+                        <div key={cat}>
+                          <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "hsl(335 50% 97%)", color: "hsl(335 50% 50%)" }}>{cat}</div>
+                          {catItems.map((it: any) => {
+                            const checked = selectedSvcs.find((s: any) => s.id === it.id);
+                            return (
+                              <button key={it.id} type="button" onClick={() => toggleSvc(it)}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-left border-t transition-colors hover:bg-pink-50"
+                                style={{ borderColor: "hsl(335 30% 93%)", background: checked ? "hsl(335 80% 60% / 0.06)" : "white" }}>
+                                <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 transition-all"
+                                  style={checked
+                                    ? { ...GRAD, borderColor: "transparent" }
+                                    : { borderColor: "hsl(335 50% 78%)" }}>
+                                  {checked && <Icon name="Check" size={10} className="text-white" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm truncate" style={P}>{it.name}</div>
+                                  {(it.price || it.duration) && (
+                                    <div className="text-[11px] flex gap-2" style={PS}>
+                                      {it.price && <span style={{ color: "hsl(335 70% 50%)" }}>{it.price}</span>}
+                                      {it.duration && <span>{it.duration}</span>}
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
               </div>
+
+              {/* Длительность процедуры */}
+              <div>
+                <label className="text-xs font-medium block mb-1" style={PS}>Длительность процедуры</label>
+                <div className="flex gap-2 items-center">
+                  <input value={form.duration} onChange={e => setForm(p => ({ ...p, duration: e.target.value }))}
+                    placeholder="мин" type="number" min="5" step="5" autoComplete="off"
+                    className="w-28 px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
+                  <span className="text-xs" style={PS}>минут</span>
+                  <div className="flex gap-1 ml-auto">
+                    {[30, 45, 60, 90, 120].map(v => (
+                      <button key={v} type="button" onClick={() => setForm(p => ({ ...p, duration: String(v) }))}
+                        className="px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+                        style={form.duration === String(v)
+                          ? { ...GRAD, color: "white" }
+                          : { background: "hsl(335 20% 93%)", color: "hsl(335 40% 55%)" }}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-medium block mb-1" style={PS}>Дата</label>
                 <input value={form.booking_date} onChange={e => setForm(p => ({ ...p, booking_date: e.target.value }))} type="date" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inp} />
@@ -3350,9 +3461,10 @@ function AdminSchedule() {
                   </div>
                   <button onClick={() => del(item.id)} className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
                 </div>
-                <div className="flex items-center gap-3 text-xs" style={PS}>
+                <div className="flex flex-wrap items-center gap-3 text-xs" style={PS}>
                   <span>📅 {item.booking_date}</span>
                   <span>🕐 {item.booking_time}</span>
+                  {item.duration && <span>⏱ {item.duration} мин</span>}
                   <span>👩 {item.master}</span>
                 </div>
                 {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs mt-1 block" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
