@@ -1947,8 +1947,8 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
                 <div className="w-full max-w-md rounded-t-3xl flex flex-col" style={{ background: "white", maxHeight: "90vh" }}
                   onClick={e => e.stopPropagation()}>
 
-                  {/* Шапка */}
-                  <div className="px-5 pt-5 pb-3 border-b flex-shrink-0" style={{ borderColor: "hsl(335 30% 92%)" }}>
+                  {/* Шапка с кнопкой — всегда видна */}
+                  <div className="px-5 pt-5 pb-4 border-b flex-shrink-0" style={{ borderColor: "hsl(335 30% 92%)" }}>
                     <div className="flex items-center justify-between mb-1">
                       <div className="text-base font-semibold" style={{ color: "hsl(335 50% 30%)" }}>Перенести запись</div>
                       <button onClick={() => setRescheduleBooking(null)} className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -1956,9 +1956,20 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
                         <Icon name="X" size={16} style={{ color: "hsl(335 40% 60%)" }} />
                       </button>
                     </div>
-                    <div className="text-xs" style={{ color: "hsl(335 30% 60%)" }}>
+                    <div className="text-xs mb-3" style={{ color: "hsl(335 30% 60%)" }}>
                       {Array.isArray(rescheduleBooking.services) ? rescheduleBooking.services.join(", ") : rescheduleBooking.service}
                     </div>
+                    {/* Кнопка перенести — всегда вверху */}
+                    <button onClick={doReschedule}
+                      disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                      className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all"
+                      style={rescheduleDate && rescheduleTime
+                        ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 14px hsl(335 80% 65% / 0.4)" }
+                        : { background: "hsl(335 20% 88%)", color: "hsl(335 20% 65%)" }}>
+                      {rescheduling ? "Переносим..." : rescheduleDate && rescheduleTime
+                        ? `✓ Перенести на ${wDays[rescheduleDay]?.day} ${wDays[rescheduleDay]?.date} в ${rescheduleTime}`
+                        : "Выбери дату и время"}
+                    </button>
                   </div>
 
                   {/* Скроллируемое содержимое */}
@@ -2025,38 +2036,8 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
 
                   </div>
 
-                  {/* Кнопки — всегда видны внизу */}
-                  <div className="px-5 pb-6 pt-3 flex-shrink-0 border-t" style={{ borderColor: "hsl(335 30% 92%)" }}>
-                    {rescheduleDate && rescheduleTime && (
-                      <div className="card-glow rounded-2xl p-3 mb-3 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: "hsl(335 80% 60% / 0.12)" }}>
-                          <Icon name="CalendarCheck" size={18} style={{ color: "hsl(335 80% 55%)" }} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-semibold" style={{ color: "hsl(335 50% 30%)" }}>
-                            {wDays[rescheduleDay]?.day}, {wDays[rescheduleDay]?.date} {wDays[rescheduleDay]?.month} в {rescheduleTime}
-                          </div>
-                          <div className="text-[11px]" style={{ color: "hsl(335 30% 60%)" }}>Новое время записи</div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <button onClick={() => setRescheduleBooking(null)}
-                        className="flex-1 py-3.5 rounded-2xl text-sm font-semibold"
-                        style={{ background: "hsl(335 20% 93%)", color: "hsl(335 40% 60%)" }}>
-                        Отмена
-                      </button>
-                      <button onClick={doReschedule}
-                        disabled={!rescheduleDate || !rescheduleTime || rescheduling}
-                        className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white transition-all"
-                        style={rescheduleDate && rescheduleTime
-                          ? { background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 14px hsl(335 80% 65% / 0.4)" }
-                          : { background: "hsl(335 20% 85%)", color: "hsl(335 20% 65%)" }}>
-                        {rescheduling ? "Переносим..." : "✓ Перенести"}
-                      </button>
-                    </div>
-                  </div>
+                  {/* Нижний отступ для скролла */}
+                  <div className="pb-2 flex-shrink-0" />
                 </div>
               </div>
             )}
