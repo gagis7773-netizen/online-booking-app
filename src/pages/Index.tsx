@@ -381,7 +381,7 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
       {/* Фото нашего салона — кликабельное, открывается на весь экран */}
       <div className="px-4 mb-5">
         <button className="w-full relative rounded-3xl overflow-hidden shadow-xl text-left"
-          style={{ height: 220 }}
+          style={{ height: Number(siteSettings.wall_height || 220) }}
           onClick={() => {
             const fs = document.createElement("div");
             fs.style.cssText = "position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer";
@@ -395,7 +395,8 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
             fs.onclick = () => document.body.removeChild(fs);
             document.body.appendChild(fs);
           }}>
-          <img src={wallImg} alt={wallTitle} className="w-full h-full object-cover object-center" />
+          <img src={wallImg} alt={wallTitle} className="w-full h-full object-cover"
+            style={{ objectPosition: `center ${siteSettings.wall_pos || 50}%` }} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(255,235,242,0.82) 100%)" }} />
           <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-[10px] flex items-center gap-1"
             style={{ background: "rgba(255,255,255,0.85)", color: "hsl(335 60% 40%)" }}>
@@ -414,17 +415,18 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         <h2 className="text-xl font-oswald font-semibold mb-3" style={{ color: "hsl(335 60% 30%)" }}>Разделы</h2>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img" },
-            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img" },
-            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img" },
-            { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img" },
+            { label: "Прайс-лист", sub: "Все услуги и цены", page: "pricelist" as Page, icon: "ClipboardList", imgKey: "section_pricelist_img", hKey: "section_pricelist_h" },
+            { label: "Галерея", sub: "Мои работы", page: "gallery" as Page, icon: "Images", imgKey: "section_gallery_img", hKey: "section_gallery_h" },
+            { label: "Отзывы", sub: "Мнения клиентов", page: "reviews" as Page, icon: "Star", imgKey: "section_reviews_img", hKey: "section_reviews_h" },
+            { label: "Документы", sub: "Сертификаты и лицензии", page: "documents" as Page, icon: "FileText", imgKey: "section_documents_img", hKey: "section_documents_h" },
           ].map(item => {
             const img = siteSettings[item.imgKey];
+            const h = Number(siteSettings[item.hKey] || 96);
             return (
               <button key={item.page} onClick={() => setPage(item.page)}
                 className="card-glow rounded-2xl overflow-hidden text-left hover:scale-105 transition-all">
                 {img ? (
-                  <div className="relative h-24">
+                  <div className="relative" style={{ height: h }}>
                     <img src={img} alt={item.label} className="w-full h-full object-cover" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 30%, rgba(255,235,242,0.92) 100%)" }} />
                     <div className="absolute bottom-2 left-3">
@@ -1275,8 +1277,8 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
           </button>
         </div>
 
-        {/* Кнопки Share / Install / Отзыв */}
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        {/* Кнопки Share / Install / Отзыв / ВКонтакте */}
+        <div className="grid grid-cols-4 gap-2 mb-5">
           <button onClick={() => setShowShare(!showShare)}
             className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
             style={{ background: "hsl(335 50% 96%)", color: "hsl(335 60% 45%)", border: "1px solid hsl(335 50% 85%)" }}>
@@ -1295,6 +1297,12 @@ function ProfileDashboard({ client, onLogout, setPage }: { client: any; onLogout
             <Icon name="Star" size={16} />
             Отзыв
           </button>
+          <a href="https://vk.ru/world_of_galis" target="_blank" rel="noopener noreferrer"
+            className="py-3 rounded-2xl text-xs font-medium flex flex-col items-center gap-1"
+            style={{ background: "hsl(215 80% 96%)", color: "hsl(215 70% 45%)", border: "1px solid hsl(215 60% 85%)" }}>
+            <Icon name="ExternalLink" size={16} style={{ color: "hsl(215 70% 45%)" }} />
+            ВКонтакте
+          </a>
         </div>
 
         {/* Поделиться — выбор мессенджера */}
@@ -1425,13 +1433,10 @@ function AdminPage({ onBack }: { onBack: () => void }) {
   const menuItems: { id: AdminSection; icon: string; label: string; color: string; ownerOnly?: boolean }[] = [
     { id: "schedule", icon: "CalendarDays", label: "Расписание", color: "from-blue-500 to-indigo-500" },
     { id: "clients", icon: "Users", label: "Клиенты", color: "from-purple-500 to-pink-500" },
-    { id: "messages", icon: "MessageCircle", label: "Сообщения", color: "from-teal-500 to-cyan-500" },
-    { id: "analytics", icon: "BarChart3", label: "Статистика", color: "from-pink-500 to-fuchsia-500", ownerOnly: true },
     { id: "notifications", icon: "Bell", label: "Уведомления", color: "from-orange-500 to-amber-500", ownerOnly: true },
     { id: "expenses", icon: "Wallet", label: "Финансы", color: "from-red-500 to-orange-500", ownerOnly: true },
     { id: "gallery", icon: "Images", label: "Галерея", color: "from-violet-500 to-purple-500" },
     { id: "pricelist_edit", icon: "ClipboardList", label: "Прайс", color: "from-pink-500 to-rose-500", ownerOnly: true },
-    { id: "staff", icon: "ShieldCheck", label: "Сотрудники", color: "from-emerald-500 to-teal-500", ownerOnly: true },
     { id: "site_settings", icon: "Paintbrush", label: "Оформление", color: "from-fuchsia-500 to-pink-500", ownerOnly: true },
     { id: "documents", icon: "FileText", label: "Документы", color: "from-amber-500 to-yellow-500", ownerOnly: true },
     { id: "settings", icon: "Settings", label: "Настройки", color: "from-gray-500 to-slate-500", ownerOnly: true },
@@ -1460,23 +1465,14 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "dashboard" && (
         <div className="px-4 pb-6">
-          {/* Главные кнопки действий */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <button
-              onClick={() => setSection("schedule")}
-              className="py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-sm"
-              style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 16px hsl(335 80% 65% / 0.35)" }}>
-              <Icon name="CalendarPlus" size={18} className="text-white" />
-              Записать клиента
-            </button>
-            <button
-              onClick={() => setSection("messages")}
-              className="py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 text-sm"
-              style={{ background: "white", color: "hsl(335 70% 45%)", border: "2px solid hsl(335 70% 78%)", boxShadow: "0 4px 16px hsl(335 50% 85% / 0.5)" }}>
-              <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 70% 45%)" }} />
-              Сообщения
-            </button>
-          </div>
+          {/* Кнопка записать клиента */}
+          <button
+            onClick={() => setSection("schedule")}
+            className="w-full py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 text-base mb-4"
+            style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))", boxShadow: "0 4px 20px hsl(335 80% 65% / 0.4)" }}>
+            <Icon name="CalendarPlus" size={20} className="text-white" />
+            Записать клиента
+          </button>
 
           {/* Краткая сводка на главной */}
           {isOwner && stats && (
@@ -1523,18 +1519,15 @@ function AdminPage({ onBack }: { onBack: () => void }) {
 
       {section === "clients" && <AdminClients />}
       {section === "schedule" && <AdminSchedule />}
-      {section === "analytics" && isOwner && <AdminAnalytics />}
-      {section === "messages" && <AdminMessages />}
-      {/* Уведомления теперь включает рассылку, шаблоны и push */}
       {section === "notifications" && isOwner && <AdminNotificationsHub />}
-      {section === "expenses" && isOwner && <AdminExpenses />}
+      {/* Финансы = расходы + доходы + сводка + статистика */}
+      {section === "expenses" && isOwner && <AdminFinanceHub />}
       {section === "gallery" && <AdminGalleryFolders />}
       {section === "pricelist_edit" && isOwner && <AdminPricelistEditor />}
-      {/* Мастера теперь в Сотрудниках */}
-      {section === "staff" && isOwner && <AdminStaffHub currentStaffId={adminUser.id} />}
       {section === "site_settings" && isOwner && <AdminSiteSettings />}
       {section === "documents" && isOwner && <AdminDocuments />}
-      {section === "settings" && isOwner && <AdminSettings />}
+      {/* Настройки теперь содержат сотрудников */}
+      {section === "settings" && isOwner && <AdminSettingsHub currentStaffId={adminUser.id} />}
       {section === "profile_edit" && isOwner && <AdminProfile onLogout={handleLogout} />}
     </div>
   );
@@ -2307,8 +2300,10 @@ function AdminSchedule() {
   // Рабочее расписание и выходные
   const [workDays, setWorkDays] = useState<any[]>([]);
   const [daysOff, setDaysOff] = useState<number[]>([]); // 0=Пн..6=Вс
+  const [specificDaysOff, setSpecificDaysOff] = useState<string[]>([]); // конкретные даты-выходные
   const [savingWork, setSavingWork] = useState(false);
   const [savedWork, setSavedWork] = useState(false);
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = () => adminPost("schedule").then(d => { setItems(d.schedule || []); setLoading(false); });
   const loadWork = () => {
@@ -2317,9 +2312,20 @@ function AdminSchedule() {
       setWorkDays(sorted);
     });
     adminPost("site_settings").then(d => {
-      const off = JSON.parse((d.settings || {}).days_off || "[]");
+      const s = d.settings || {};
+      const off = JSON.parse(s.days_off || "[]");
       setDaysOff(off);
+      const specOff = JSON.parse(s.specific_days_off || "[]");
+      setSpecificDaysOff(specOff);
     });
+  };
+
+  const toggleSpecificDayOff = async (dateStr: string) => {
+    const updated = specificDaysOff.includes(dateStr)
+      ? specificDaysOff.filter(d => d !== dateStr)
+      : [...specificDaysOff, dateStr];
+    setSpecificDaysOff(updated);
+    await adminPost("site_settings", { action: "save", settings: { specific_days_off: JSON.stringify(updated) } });
   };
   useEffect(() => { load(); loadWork(); }, []);
 
@@ -2367,6 +2373,30 @@ function AdminSchedule() {
 
   const todayStr = formatDate(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
   const selectedItems = selectedDate ? (itemsByDate[selectedDate] || []) : [];
+
+  // Свободные окна для выбранного дня
+  const getFreeSlots = (dateStr: string) => {
+    if (!dateStr) return [];
+    const dow = dayOfWeekForDate(
+      Number(dateStr.slice(0,4)), Number(dateStr.slice(5,7))-1, Number(dateStr.slice(8,10))
+    );
+    const dayWork = workDays.find(d => ((d.day_of_week + 6) % 7) === dow);
+    if (!dayWork || !dayWork.time_from || !dayWork.time_to) return [];
+    const bookedTimes = new Set((itemsByDate[dateStr] || []).map((b: any) => b.booking_time?.slice(0,5)));
+    const slots: string[] = [];
+    const [fh, fm] = (dayWork.time_from || "10:00").split(":").map(Number);
+    const [th, tm] = (dayWork.time_to || "20:00").split(":").map(Number);
+    let cur = fh * 60 + fm;
+    const end = th * 60 + tm;
+    while (cur < end) {
+      const hh = String(Math.floor(cur / 60)).padStart(2, "0");
+      const mm = String(cur % 60).padStart(2, "0");
+      const slot = `${hh}:${mm}`;
+      if (!bookedTimes.has(slot)) slots.push(slot);
+      cur += 60; // шаг 1 час
+    }
+    return slots;
+  };
 
   return (
     <div className="pb-6">
@@ -2422,26 +2452,47 @@ function AdminSchedule() {
               const day = i + 1;
               const dateStr = formatDate(calYear, calMonth, day);
               const dow = dayOfWeekForDate(calYear, calMonth, day);
-              const isOff = daysOff.includes(dow);
+              const isWeeklyOff = daysOff.includes(dow);
+              const isSpecificOff = specificDaysOff.includes(dateStr);
+              const isOff = isWeeklyOff || isSpecificOff;
               const bookings = itemsByDate[dateStr] || [];
               const isToday = dateStr === todayStr;
               const isSelected = dateStr === selectedDate;
               return (
-                <button key={day} onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                <button key={day}
+                  onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                  onMouseDown={() => {
+                    longPressTimer.current = setTimeout(() => {
+                      toggleSpecificDayOff(dateStr);
+                    }, 600);
+                  }}
+                  onMouseUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                  onMouseLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                  onTouchStart={() => {
+                    longPressTimer.current = setTimeout(() => {
+                      toggleSpecificDayOff(dateStr);
+                    }, 600);
+                  }}
+                  onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
                   className="relative flex flex-col items-center justify-start py-1.5 rounded-xl transition-all min-h-[44px]"
                   style={isSelected
                     ? { ...GRAD, color: "white" }
-                    : isToday
-                      ? { background: "hsl(335 80% 60% / 0.15)", border: "1.5px solid hsl(335 80% 65%)" }
-                      : isOff
-                        ? { background: "hsl(0 40% 97%)" }
-                        : { background: "hsl(335 50% 98%)" }}>
-                  <span className="text-xs font-bold" style={isSelected ? { color: "white" } : isOff ? { color: "hsl(0 50% 70%)" } : P}>
+                    : isSpecificOff
+                      ? { background: "hsl(0 60% 55%)", }
+                      : isToday
+                        ? { background: "hsl(335 80% 60% / 0.15)", border: "1.5px solid hsl(335 80% 65%)" }
+                        : isWeeklyOff
+                          ? { background: "hsl(0 30% 96%)" }
+                          : { background: "hsl(335 50% 98%)" }}>
+                  <span className="text-xs font-bold"
+                    style={isSelected ? { color: "white" }
+                      : isSpecificOff ? { color: "white" }
+                      : isWeeklyOff ? { color: "hsl(0 50% 70%)" } : P}>
                     {day}
                   </span>
                   {bookings.length > 0 && (
                     <span className="text-[9px] font-bold mt-0.5 px-1 rounded-full"
-                      style={isSelected
+                      style={isSelected || isSpecificOff
                         ? { background: "rgba(255,255,255,0.3)", color: "white" }
                         : { background: "hsl(335 80% 58%)", color: "white" }}>
                       {bookings.length}
@@ -2461,29 +2512,71 @@ function AdminSchedule() {
             + Добавить запись{selectedDate ? ` на ${selectedDate.slice(8)}.${selectedDate.slice(5,7)}` : ""}
           </button>
 
-          {/* Записи выбранного дня */}
+          {/* Записи и свободные окна выбранного дня */}
           {selectedDate && (
             <div>
-              <div className="text-sm font-semibold mb-3" style={P}>
-                {selectedDate.slice(8)}.{selectedDate.slice(5,7)}.{selectedDate.slice(0,4)}
-                {" — "}
-                {selectedItems.length > 0 ? `${selectedItems.length} зап.` : "нет записей"}
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-semibold" style={P}>
+                  {selectedDate.slice(8)}.{selectedDate.slice(5,7)}.{selectedDate.slice(0,4)}
+                </div>
+                {specificDaysOff.includes(selectedDate) && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 45%)" }}>
+                    🔴 Выходной (удержать для отмены)
+                  </span>
+                )}
               </div>
-              <div className="space-y-2">
-                {selectedItems.map(item => (
-                  <div key={item.id} className="card-glow rounded-2xl p-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
-                        <div className="text-xs" style={PS}>{item.booking_time} · {item.services}</div>
-                        {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
+
+              {/* Записи */}
+              {selectedItems.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs font-semibold mb-2" style={{ color: "hsl(335 80% 50%)" }}>Записи ({selectedItems.length})</div>
+                  <div className="space-y-2">
+                    {selectedItems.map(item => (
+                      <div key={item.id} className="card-glow rounded-2xl p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-semibold text-sm" style={P}>{item.client_name}</div>
+                            <div className="text-xs" style={PS}>{item.booking_time} · {item.services}</div>
+                            {item.client_phone && <a href={`tel:${item.client_phone}`} className="text-xs" style={{ color: "hsl(335 80% 55%)" }}>{item.client_phone}</a>}
+                          </div>
+                          <button onClick={() => del(item.id)} className="px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
+                        </div>
                       </div>
-                      <button onClick={() => del(item.id)} className="px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(0 60% 95%)", color: "hsl(0 60% 55%)" }}>✕</button>
-                    </div>
+                    ))}
                   </div>
-                ))}
-                {selectedItems.length === 0 && <div className="text-center py-4 text-xs" style={PS}>Записей нет. Нажми «+ Добавить»</div>}
-              </div>
+                </div>
+              )}
+
+              {/* Свободные окна */}
+              {!specificDaysOff.includes(selectedDate) && (() => {
+                const freeSlots = getFreeSlots(selectedDate);
+                return freeSlots.length > 0 ? (
+                  <div>
+                    <div className="text-xs font-semibold mb-2" style={{ color: "hsl(142 60% 40%)" }}>
+                      ✅ Свободные окна ({freeSlots.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {freeSlots.map(slot => (
+                        <button key={slot}
+                          onClick={() => {
+                            setForm(f => ({ ...f, booking_date: selectedDate, booking_time: slot }));
+                            setAdding(true);
+                            setTab("list");
+                          }}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+                          style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)", border: "1px solid hsl(142 50% 82%)" }}>
+                          {slot}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] mt-2" style={PS}>Нажми на время, чтобы сразу создать запись</p>
+                  </div>
+                ) : selectedItems.length === 0 ? (
+                  <div className="text-center py-4 text-xs" style={PS}>Нет данных о рабочих часах. Настрой в «Часы работы»</div>
+                ) : null;
+              })()}
+
+              <p className="text-[10px] mt-3" style={PS}>💡 Удержи день чтобы сделать его выходным</p>
             </div>
           )}
         </div>
@@ -4140,37 +4233,86 @@ function AdminSiteSettings() {
         )}
       </div>
 
-      {/* Картина на стене */}
-      <div className="card-glow rounded-2xl p-4">
-        <div className="font-semibold text-sm mb-1" style={P}>Фото нашего салона (главная)</div>
-        <p className="text-xs mb-3" style={PS}>Большой баннер между мастерами и разделами</p>
+      {/* Фото нашего салона */}
+      <div className="card-glow rounded-2xl p-4 space-y-3">
+        <div className="font-semibold text-sm" style={P}>Фото нашего салона (главная)</div>
+        <p className="text-xs" style={PS}>Большой баннер между мастерами и разделами</p>
         <PhotoUploadButton folder="wall" label="📷 Загрузить фото салона" uploading={uploadingWall} setUploading={setUploadingWall}
-          onUploaded={url => set("wall_image_url", url)} className="w-full mb-2" />
+          onUploaded={url => set("wall_image_url", url)} className="w-full" />
         {settings.wall_image_url && (
-          <img src={settings.wall_image_url} className="w-full h-32 object-cover rounded-xl" alt="wall" />
+          <>
+            {/* Слайдер высоты */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs" style={PS}>Высота блока</label>
+                <span className="text-xs font-medium" style={P}>{settings.wall_height || "220"}px</span>
+              </div>
+              <input type="range" min="120" max="420" step="10"
+                value={settings.wall_height || "220"}
+                onChange={e => set("wall_height", e.target.value)}
+                className="w-full accent-pink-500" />
+            </div>
+            {/* Слайдер позиции фото (object-position) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs" style={PS}>Положение фото (по вертикали)</label>
+                <span className="text-xs font-medium" style={P}>{settings.wall_pos || "50"}%</span>
+              </div>
+              <input type="range" min="0" max="100" step="5"
+                value={settings.wall_pos || "50"}
+                onChange={e => set("wall_pos", e.target.value)}
+                className="w-full accent-pink-500" />
+            </div>
+            <div style={{ height: Number(settings.wall_height || 220) }} className="rounded-xl overflow-hidden">
+              <img src={settings.wall_image_url}
+                className="w-full h-full object-cover"
+                style={{ objectPosition: `center ${settings.wall_pos || 50}%` }}
+                alt="preview" />
+            </div>
+          </>
         )}
+        <button onClick={saveAll} disabled={saving}
+          className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : "💾 Сохранить фото салона"}
+        </button>
       </div>
 
       {/* Фото разделов */}
-      <div className="card-glow rounded-2xl p-4">
-        <div className="font-semibold text-sm mb-1" style={P}>Фото разделов</div>
-        <p className="text-xs mb-3" style={PS}>Фото вместо иконок в блоке «Разделы» на главной</p>
+      <div className="card-glow rounded-2xl p-4 space-y-4">
+        <div className="font-semibold text-sm" style={P}>Фото разделов</div>
+        <p className="text-xs" style={PS}>Фото вместо иконок в блоке «Разделы» на главной</p>
         {[
-          { key: "section_pricelist_img", label: "Прайс-лист" },
-          { key: "section_gallery_img", label: "Галерея" },
-          { key: "section_reviews_img", label: "Отзывы" },
-          { key: "section_documents_img", label: "Документы" },
+          { key: "section_pricelist_img", label: "Прайс-лист", hKey: "section_pricelist_h" },
+          { key: "section_gallery_img", label: "Галерея", hKey: "section_gallery_h" },
+          { key: "section_reviews_img", label: "Отзывы", hKey: "section_reviews_h" },
+          { key: "section_documents_img", label: "Документы", hKey: "section_documents_h" },
         ].map(f => (
-          <div key={f.key} className="mb-3">
-            <label className="text-xs block mb-1" style={PS}>{f.label}</label>
-            <div className="flex items-center gap-2">
-              {settings[f.key] && (
-                <img src={settings[f.key]} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" alt={f.label} />
-              )}
-              <SectionPhotoUpload settingKey={f.key} set={set} />
-            </div>
+          <div key={f.key} className="rounded-xl p-3 space-y-2" style={{ background: "hsl(335 50% 98%)", border: "1px solid hsl(335 40% 92%)" }}>
+            <div className="text-xs font-semibold" style={P}>{f.label}</div>
+            <SectionPhotoUpload settingKey={f.key} set={set} />
+            {settings[f.key] && (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs" style={PS}>Высота карточки</span>
+                    <span className="text-xs font-medium" style={P}>{settings[f.hKey] || "96"}px</span>
+                  </div>
+                  <input type="range" min="60" max="200" step="4"
+                    value={settings[f.hKey] || "96"}
+                    onChange={e => set(f.hKey, e.target.value)}
+                    className="w-full accent-pink-500" />
+                </div>
+                <div className="overflow-hidden rounded-lg" style={{ height: Number(settings[f.hKey] || 96) }}>
+                  <img src={settings[f.key]} className="w-full h-full object-cover" alt={f.label} />
+                </div>
+              </>
+            )}
           </div>
         ))}
+        <button onClick={saveAll} disabled={saving}
+          className="w-full py-2.5 rounded-xl font-semibold text-white text-sm" style={GRAD}>
+          {saving ? "Сохраняем..." : "💾 Сохранить фото разделов"}
+        </button>
       </div>
 
       {/* Адрес и контакты */}
@@ -4353,6 +4495,58 @@ function AdminStaffHub({ currentStaffId }: { currentStaffId: number }) {
       </div>
       {tab === "masters" && <AdminMastersEditor />}
       {tab === "staff" && <AdminStaff currentStaffId={currentStaffId} />}
+    </div>
+  );
+}
+
+// ── Финансы (хаб: расходы + доходы + сводка + статистика) ──
+function AdminFinanceHub() {
+  const [tab, setTab] = useState<"expenses" | "income" | "monthly" | "stats">("expenses");
+  return (
+    <div className="px-4 pb-6">
+      <div className="grid grid-cols-2 gap-1 rounded-2xl overflow-hidden mb-5" style={{ background: "hsl(335 30% 92%)" }}>
+        {([
+          { id: "expenses", label: "💸 Расходы" },
+          { id: "income", label: "💰 Доходы" },
+          { id: "monthly", label: "📊 Сводка" },
+          { id: "stats", label: "📈 Статистика" },
+        ] as const).map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className="py-2.5 text-sm font-semibold transition-all"
+            style={tab === t.id ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === "expenses" && <ExpensesTab />}
+      {tab === "income" && <IncomeTab />}
+      {tab === "monthly" && <MonthlyFinanceTab />}
+      {tab === "stats" && <AdminAnalytics />}
+    </div>
+  );
+}
+
+// ── Настройки + Сотрудники (хаб) ──
+function AdminSettingsHub({ currentStaffId }: { currentStaffId: number }) {
+  const [tab, setTab] = useState<"settings" | "staff">("settings");
+  return (
+    <div>
+      <div className="px-4 mb-4">
+        <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
+          <button onClick={() => setTab("settings")}
+            className="flex-1 py-2.5 text-sm font-semibold transition-all"
+            style={tab === "settings" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            ⚙️ Настройки
+          </button>
+          <button onClick={() => setTab("staff")}
+            className="flex-1 py-2.5 text-sm font-semibold transition-all"
+            style={tab === "staff" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            👥 Сотрудники
+          </button>
+        </div>
+      </div>
+      {tab === "settings" && <AdminSettings />}
+      {tab === "staff" && <AdminStaffHub currentStaffId={currentStaffId} />}
     </div>
   );
 }

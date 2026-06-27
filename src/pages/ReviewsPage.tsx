@@ -18,7 +18,7 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
   const [reviews, setReviews] = useState<any[]>([]);
   const [yandexReviews, setYandexReviews] = useState<any[]>([]);
   const [yandexRating, setYandexRating] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"site" | "yandex">("yandex");
+  const [activeTab, setActiveTab] = useState<"site" | "yandex">("site");
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [rating, setRating] = useState(5);
@@ -166,13 +166,13 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
       {/* Вкладки */}
       <div className="px-4 mb-4">
         <div className="flex rounded-2xl overflow-hidden" style={{ background: "hsl(335 30% 92%)" }}>
-          <button onClick={() => setActiveTab("yandex")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
-            style={activeTab === "yandex" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
-            🗺 Яндекс Карты
-          </button>
           <button onClick={() => setActiveTab("site")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
             style={activeTab === "site" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
             🌸 Отзывы сайта
+          </button>
+          <button onClick={() => setActiveTab("yandex")} className="flex-1 py-2.5 text-sm font-semibold transition-all"
+            style={activeTab === "yandex" ? { ...GRAD, color: "white" } : { color: "hsl(335 40% 60%)" }}>
+            🗺 Яндекс Карты
           </button>
         </div>
       </div>
