@@ -156,7 +156,7 @@ def handler(event: dict, context) -> dict:
                 photo_url = upload_image(get_s3(), "reviews", body["photo_name"], body["photo_data"])
             conn = get_conn()
             cur = conn.cursor()
-            cur.execute(f"INSERT INTO {SCHEMA}.reviews (client_name, rating, review_text, photo_url, service) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+            cur.execute(f"INSERT INTO {SCHEMA}.reviews (client_name, rating, review_text, photo_url, service, is_approved) VALUES (%s,%s,%s,%s,%s,TRUE) RETURNING id",
                         (body.get("client_name", "Анонимно"), int(body.get("rating", 5)), body.get("text"), photo_url, body.get("service")))
             rid = cur.fetchone()[0]
             conn.commit()

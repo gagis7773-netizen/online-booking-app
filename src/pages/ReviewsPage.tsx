@@ -120,17 +120,31 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
   const submit = async () => {
     if (!name.trim() || !text.trim()) return;
     setSending(true);
-    const body: any = { client_name: name, rating, text, service };
-    if (photo) { body.photo_data = photo.data; body.photo_name = photo.name; }
-    await fetch(`${CONTENT_URL}/reviews`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setDone(true);
-    setSending(false);
-    setShowForm(false);
-    loadReviews();
+    try {
+      const body: any = { client_name: name, rating, text, service };
+      if (photo) { body.photo_data = photo.data; body.photo_name = photo.name; }
+      const res = await fetch(`${CONTENT_URL}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok && (data.id || data.success)) {
+        setDone(true);
+        setShowForm(false);
+        setName("");
+        setText("");
+        setRating(5);
+        setPhoto(null);
+        loadReviews();
+      } else {
+        alert("Не удалось отправить отзыв. Попробуйте ещё раз.");
+      }
+    } catch {
+      alert("Ошибка соединения. Проверьте интернет и попробуйте снова.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const siteAvg = reviews.length > 0
@@ -225,7 +239,7 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
       {done && (
         <div className="mx-4 mb-4 p-4 rounded-2xl text-sm font-medium text-center"
           style={{ background: "hsl(335 80% 60% / 0.1)", color: pink, border: `1px solid ${pinkBorder}` }}>
-          Спасибо! Ваш отзыв опубликован ✨
+          Спасибо! Ваш отзыв отправлен и появится после проверки ✨
         </div>
       )}
 
