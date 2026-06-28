@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import ReviewsPage from "./ReviewsPage";
 import ChatPage from "./ChatPage";
@@ -3089,9 +3089,8 @@ function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void;
 }
 
 // ── Чат с клиентами ──
-const CHAT_API = "https://functions.poehali.dev/cadfcb18-918a-427c-a334-5c8c8ace2c06";
-
 function AdminMessages() {
+  const CHAT_API = "https://functions.poehali.dev/cadfcb18-918a-427c-a334-5c8c8ace2c06";
   const [chats, setChats] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
