@@ -6,7 +6,6 @@ import uuid
 import urllib.request
 import urllib.parse
 import psycopg2
-import boto3
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p3248579_online_booking_app")
 CORS = {
@@ -19,6 +18,7 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 def get_s3():
+    import boto3
     return boto3.client("s3", endpoint_url="https://bucket.poehali.dev",
         aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])

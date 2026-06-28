@@ -51,15 +51,17 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
   const scroll = () => bottomRef.current?.scrollIntoView({ behavior: "smooth" });
 
   const loadMessages = async (id: number) => {
-    const res = await fetch(`${CHAT_URL}/messages?chat_id=${id}`);
-    const data = await res.json();
-    const msgs = data.messages || [];
-    const incoming = msgs.filter((m: any) => m.sender !== "client");
-    if (incoming.length > prevMsgCount.current && prevMsgCount.current > 0) {
-      playClientMessageSound();
-    }
-    prevMsgCount.current = incoming.length;
-    setMessages(msgs);
+    try {
+      const res = await fetch(`${CHAT_URL}/messages?chat_id=${id}`);
+      const data = await res.json();
+      const msgs = data.messages || [];
+      const incoming = msgs.filter((m: any) => m.sender !== "client");
+      if (incoming.length > prevMsgCount.current && prevMsgCount.current > 0) {
+        playClientMessageSound();
+      }
+      prevMsgCount.current = incoming.length;
+      setMessages(msgs);
+    } catch { /* silent — повторим при следующем поллинге */ }
   };
 
   const startChat = async (clientName: string, clientPhone: string) => {
@@ -69,7 +71,9 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ client_name: clientName, client_phone: clientPhone, message: "Здравствуйте! Хочу узнать подробнее." }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (!data.chat_id) throw new Error("no chat_id");
     setChatId(data.chat_id);
     chatIdRef.current = data.chat_id;
     setStarted(true);
@@ -112,20 +116,29 @@ export default function ChatPage({ onBack, client }: { onBack?: () => void; clie
   const sendMessage = async (content: string, type = "text", fileData?: string, fileName?: string) => {
     if (!chatId || (!content && !fileData)) return;
     setSending(true);
-    const body: any = { chat_id: chatId, sender: "client", content, type };
-    if (fileData) { body.file_data = fileData; body.file_name = fileName; }
-    const res = await fetch(`${CHAT_URL}/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    setMessages(prev => [...prev, {
-      id: data.id, sender: "client", type, content: content || fileName,
-      file_url: null, file_name: fileName, created_at: data.created_at
-    }]);
-    setInput("");
-    setSending(false);
+    try {
+      const body: any = { chat_id: chatId, sender: "client", content, type };
+      if (fileData) { body.file_data = fileData; body.file_name = fileName; }
+      const res = await fetch(`${CHAT_URL}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessages(prev => [...prev, {
+          id: data.id, sender: "client", type, content: content || fileName,
+          file_url: null, file_name: fileName, created_at: data.created_at || new Date().toISOString()
+        }]);
+        setInput("");
+      } else {
+        alert("Не удалось отправить сообщение. Попробуйте ещё раз.");
+      }
+    } catch {
+      alert("Ошибка соединения. Попробуйте ещё раз.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
