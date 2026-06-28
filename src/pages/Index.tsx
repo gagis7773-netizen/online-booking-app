@@ -823,6 +823,16 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         </div>
       </div>
 
+      {/* Написать нам */}
+      <div className="px-4 mb-5">
+        <button onClick={() => navigateTo("chat")}
+          className="w-full py-4 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2.5 shadow-sm transition-all active:scale-95"
+          style={{ background: "white", color: "hsl(335 70% 45%)", border: "1.5px solid hsl(335 60% 82%)" }}>
+          <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 75% 52%)" }} />
+          Написать нам — ответим быстро 💬
+        </button>
+      </div>
+
       {/* Видео — под разделами */}
       {siteSettings.video_show === "true" && siteSettings.video_url && (
         <div className="px-4 mb-5">
@@ -7524,6 +7534,7 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "shop", icon: "ShoppingBag", label: "Магазин" },
+    { id: "chat", icon: "MessageCircle", label: "Чат" },
     { id: "profile", icon: "User", label: "Профиль" },
   ];
 
