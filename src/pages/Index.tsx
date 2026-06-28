@@ -1791,7 +1791,28 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
             style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
             🌸 Записаться
           </button>
-
+          {!isPushEnabled() ? (
+            <button
+              onClick={async () => {
+                const ok = await registerPush();
+                if (ok) {
+                  await showPushNotification("Girly Paradise 🌸", "Отлично! Теперь вы будете первыми узнавать об акциях и новостях салона.");
+                } else {
+                  alert("Разреши уведомления в настройках браузера");
+                }
+              }}
+              className="py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg, hsl(270 60% 58%), hsl(300 60% 62%))", color: "white" }}>
+              <Icon name="Bell" size={16} className="text-white" />
+              Уведомления
+            </button>
+          ) : (
+            <div className="py-3.5 rounded-2xl text-xs font-medium text-center flex items-center justify-center gap-2"
+              style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>
+              <Icon name="Bell" size={14} />
+              Уведомления вкл ✅
+            </div>
+          )}
         </div>
 
         {/* Кнопки Share / Install / Отзыв / ВКонтакте / Звук */}
@@ -1835,29 +1856,7 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
           </button>
         </div>
 
-        {/* Пуш-уведомления для клиента */}
-        {!isPushEnabled() && (
-          <button
-            onClick={async () => {
-              const ok = await registerPush();
-              if (ok) {
-                await showPushNotification("Girly Paradise 🌸", "Отлично! Теперь вы будете первыми узнавать об акциях и новостях салона.");
-              } else {
-                alert("Разреши уведомления в настройках браузера");
-              }
-            }}
-            className="w-full py-3 rounded-2xl text-sm font-semibold mb-4 flex items-center justify-center gap-2"
-            style={{ background: "linear-gradient(135deg, hsl(270 60% 58%), hsl(300 60% 62%))", color: "white", boxShadow: "0 3px 12px hsl(270 60% 70% / 0.4)" }}>
-            <Icon name="Bell" size={16} className="text-white" />
-            Включить уведомления 📲
-          </button>
-        )}
-        {isPushEnabled() && (
-          <div className="w-full py-2.5 rounded-2xl text-xs font-medium text-center mb-4"
-            style={{ background: "hsl(142 60% 94%)", color: "hsl(142 60% 35%)" }}>
-            ✅ Уведомления включены
-          </div>
-        )}
+
 
         {/* Форма отзыва — сразу под кнопками */}
         {showReview && (
