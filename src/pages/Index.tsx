@@ -4073,68 +4073,7 @@ function AdminSchedule() {
   );
 }
 
-// ── Сообщения ──
-function AdminMessages() {
-  const [chats, setChats] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const prevCount = React.useRef<number>(0);
 
-  const load = () => {
-    adminPost("messages").then(d => {
-      const newChats = d.chats || [];
-      // Звук при новых сообщениях
-      if (!loading && newChats.length > 0) {
-        const totalNew = newChats.reduce((s: number, c: any) => s + (c.msg_count || 0), 0);
-        if (totalNew > prevCount.current) {
-          const ss = getSoundSettings();
-          if (ss.enabled !== false) {
-            playNotificationSound(ss.preset || "bell", Number(ss.volume ?? 0.5));
-          }
-          // Пуш-уведомление для администратора
-          const newCount = totalNew - prevCount.current;
-          showPushNotification(
-            "Girly Paradise 🌸",
-            `${newCount > 1 ? `${newCount} новых сообщений` : "Новое сообщение"} от клиентов`,
-            "new-message"
-          );
-        }
-        prevCount.current = totalNew;
-      }
-      setChats(newChats);
-      setLoading(false);
-    });
-  };
-
-  useEffect(() => {
-    load();
-    // Поллинг каждые 15 секунд
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="px-4 pb-6">
-      {loading && <div className="text-center py-10"><div className="text-3xl animate-float">🌸</div></div>}
-      {!loading && chats.length === 0 && <div className="text-center py-10 text-sm" style={PS}>Сообщений пока нет</div>}
-      <div className="space-y-2">
-        {chats.map(c => (
-          <div key={c.id} className="card-glow rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={GRAD}>
-                {c.client_name?.[0]?.toUpperCase() || "?"}
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold text-sm" style={P}>{c.client_name}</div>
-                <div className="text-xs" style={PS}>{c.client_phone} · {c.msg_count} сообщ.</div>
-              </div>
-              <div className="text-xs" style={PS}>{c.last_msg?.slice(0, 10)}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ── Уведомления / SMS ──
 function AdminNotifications() {
