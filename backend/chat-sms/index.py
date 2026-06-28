@@ -105,6 +105,9 @@ def handler(event: dict, context) -> dict:
         cur.execute(f"INSERT INTO {SCHEMA}.chat_messages (chat_id, sender, content) VALUES (%s,'client',%s)", (chat_id, first_msg))
         conn.commit()
         conn.close()
+        # SMS владельцу — новый чат открыт
+        phone_display = phone or "без телефона"
+        send_sms("+79046015556", f"Girly Paradise: новый чат от {name} ({phone_display}). Откройте приложение чтобы ответить!")
         return {"statusCode": 200, "headers": CORS, "body": json.dumps({"chat_id": chat_id})}
 
     # POST /chat-sms/send — отправить сообщение
@@ -138,10 +141,25 @@ def handler(event: dict, context) -> dict:
         row = cur.fetchone()
         if sender == "client":
             cur.execute(f"UPDATE {SCHEMA}.chats SET last_message_at=NOW(), unread_count=unread_count+1 WHERE id=%s", (chat_id,))
+            # Получаем имя клиента для SMS
+            cur.execute(f"SELECT client_name, unread_count FROM {SCHEMA}.chats WHERE id=%s", (chat_id,))
+            chat_row = cur.fetchone()
+            client_name = chat_row[0] if chat_row else "Клиент"
+            unread = chat_row[1] if chat_row else 1
         else:
             cur.execute(f"UPDATE {SCHEMA}.chats SET last_message_at=NOW() WHERE id=%s", (chat_id,))
+            client_name = None
+            unread = 0
         conn.commit()
         conn.close()
+
+        # SMS владельцу — только первое сообщение или каждое 3-е чтобы не спамить
+        if sender == "client" and unread in (1, 4, 7):
+            owner_phone = "+79046015556"
+            preview = (content or "📎 файл")[:60]
+            sms_text = f"Girly Paradise: новое сообщение от {client_name}: «{preview}». Ответьте в приложении!"
+            send_sms(owner_phone, sms_text)
+
         return {"statusCode": 200, "headers": CORS, "body": json.dumps({"id": row[0], "created_at": row[1].isoformat()})}
 
     # ===== SMS =====
