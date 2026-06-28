@@ -3088,6 +3088,243 @@ function AdminPinScreen({ onSuccess, onBack }: { onSuccess: (user: any) => void;
   );
 }
 
+// ── Чат с клиентами ──
+const CHAT_API = "https://functions.poehali.dev/cadfcb18-918a-427c-a334-5c8c8ace2c06";
+
+function AdminMessages() {
+  const [chats, setChats] = useState<any[]>([]);
+  const [activeChat, setActiveChat] = useState<any | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const pinkG = "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))";
+  const pinkBorder = "hsl(335 50% 85%)";
+  const textDark = "hsl(335 50% 25%)";
+  const textMid = "hsl(335 30% 55%)";
+  const pink = "hsl(335 80% 55%)";
+  const pinkBg = "hsl(335 80% 60% / 0.1)";
+
+  const loadChats = async () => {
+    try {
+      const res = await fetch(`${CHAT_API}/chats`);
+      const data = await res.json();
+      setChats(data.chats || []);
+    } catch { /* silent */ }
+  };
+
+  const loadMessages = async (chatId: number) => {
+    try {
+      const res = await fetch(`${CHAT_API}/messages?chat_id=${chatId}`);
+      const data = await res.json();
+      setMessages(data.messages || []);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    } catch { /* silent */ }
+  };
+
+  const openChat = (chat: any) => {
+    setActiveChat(chat);
+    loadMessages(chat.id);
+    // Сбросим бейдж
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim() || !activeChat) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${CHAT_API}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: activeChat.id, sender: "admin", content: input, type: "text" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessages(prev => [...prev, {
+          id: data.id, sender: "admin", type: "text", content: input,
+          created_at: data.created_at || new Date().toISOString(),
+        }]);
+        setInput("");
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    } catch { /* silent */ }
+    finally { setSending(false); }
+  };
+
+  useEffect(() => {
+    loadChats();
+  }, []);
+
+  // Поллинг активного чата каждые 5 секунд
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (!activeChat) return;
+    pollRef.current = setInterval(() => loadMessages(activeChat.id), 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [activeChat]);  
+
+  const formatTime = (iso: string) => {
+    try { return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }); }
+    catch { return ""; }
+  };
+
+  const formatDate = (iso: string) => {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      const today = new Date();
+      if (d.toDateString() === today.toDateString()) return formatTime(iso);
+      return d.toLocaleDateString("ru", { day: "numeric", month: "short" });
+    } catch { return ""; }
+  };
+
+  // ── Список чатов ──
+  if (!activeChat) {
+    return (
+      <div className="px-4 pt-2 pb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-oswald font-bold" style={{ color: textDark }}>Сообщения</h2>
+          <button onClick={loadChats} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: pinkBg }}>
+            <Icon name="RefreshCw" size={14} style={{ color: pink }} />
+          </button>
+        </div>
+
+        {chats.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-4xl mb-3">💬</div>
+            <p className="text-sm" style={{ color: textMid }}>Пока нет сообщений от клиентов</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {chats.map(chat => (
+              <button key={chat.id} onClick={() => openChat(chat)}
+                className="w-full card-glow rounded-2xl p-4 text-left flex items-center gap-3 transition-all active:scale-95">
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+                  style={{ background: pinkG }}>
+                  {chat.client_name?.[0]?.toUpperCase() || "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-semibold text-sm truncate" style={{ color: textDark }}>{chat.client_name}</span>
+                    <span className="text-[11px] flex-shrink-0 ml-2" style={{ color: textMid }}>{formatDate(chat.last_message_at)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs truncate" style={{ color: textMid }}>{chat.last_msg || "Нет сообщений"}</span>
+                    {chat.unread_count > 0 && (
+                      <span className="ml-2 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center text-white flex-shrink-0"
+                        style={{ background: "hsl(335 80% 55%)" }}>
+                        {chat.unread_count}
+                      </span>
+                    )}
+                  </div>
+                  {chat.client_phone && (
+                    <div className="text-[11px] mt-0.5" style={{ color: "hsl(335 40% 72%)" }}>{chat.client_phone}</div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Активный чат ──
+  return (
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 140px)" }}>
+      {/* Header чата */}
+      <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
+        style={{ background: "white", borderBottom: `1px solid ${pinkBorder}` }}>
+        <button onClick={() => { setActiveChat(null); loadChats(); }}
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: pinkBg }}>
+          <Icon name="ChevronLeft" size={18} style={{ color: pink }} />
+        </button>
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-base flex-shrink-0 font-bold text-white"
+          style={{ background: pinkG }}>
+          {activeChat.client_name?.[0]?.toUpperCase() || "?"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm truncate" style={{ color: textDark }}>{activeChat.client_name}</div>
+          {activeChat.client_phone && <div className="text-xs" style={{ color: textMid }}>{activeChat.client_phone}</div>}
+        </div>
+        <button onClick={() => loadMessages(activeChat.id)}
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: pinkBg }}>
+          <Icon name="RefreshCw" size={14} style={{ color: pink }} />
+        </button>
+      </div>
+
+      {/* Сообщения */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2" style={{ background: "hsl(335 60% 98%)" }}>
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full" style={{ color: textMid }}>
+            <div className="text-3xl mb-2">💬</div>
+            <p className="text-sm">Нет сообщений</p>
+          </div>
+        )}
+        {messages.map((msg: any, i: number) => {
+          const isAdmin = msg.sender === "admin";
+          const showDate = i === 0 || new Date(msg.created_at).toDateString() !== new Date(messages[i - 1].created_at).toDateString();
+          return (
+            <div key={msg.id || i}>
+              {showDate && (
+                <div className="text-center my-2">
+                  <span className="text-[11px] px-3 py-1 rounded-full" style={{ background: "hsl(335 30% 90%)", color: textMid }}>
+                    {new Date(msg.created_at).toLocaleDateString("ru", { day: "numeric", month: "long" })}
+                  </span>
+                </div>
+              )}
+              <div className={`flex ${isAdmin ? "justify-end" : "justify-start"} items-end gap-1.5`}>
+                {!isAdmin && (
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mb-1"
+                    style={{ background: pinkG }}>
+                    {activeChat.client_name?.[0]?.toUpperCase() || "?"}
+                  </div>
+                )}
+                <div className="max-w-[78%]">
+                  {msg.type === "image" && msg.file_url && (
+                    <img src={msg.file_url} alt="фото" className="rounded-2xl max-w-full shadow-sm mb-0.5" style={{ maxHeight: 200 }} />
+                  )}
+                  {msg.content && (
+                    <div className="px-4 py-2.5 rounded-2xl text-sm shadow-sm"
+                      style={isAdmin
+                        ? { background: pinkG, color: "white", borderBottomRightRadius: 4 }
+                        : { background: "white", color: textDark, border: `1px solid ${pinkBorder}`, borderBottomLeftRadius: 4 }}>
+                      {msg.content}
+                    </div>
+                  )}
+                  <div className="text-[11px] mt-0.5 px-1" style={{ color: textMid, textAlign: isAdmin ? "right" : "left" }}>
+                    {formatTime(msg.created_at)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Поле ввода */}
+      <div className="px-3 py-3 flex-shrink-0 flex items-center gap-2"
+        style={{ background: "white", borderTop: `1px solid ${pinkBorder}` }}>
+        <input
+          value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+          placeholder="Ответить клиенту..."
+          className="flex-1 px-4 py-3 rounded-full text-sm outline-none"
+          style={{ background: "hsl(335 40% 97%)", border: `1px solid ${pinkBorder}`, color: textDark }}
+        />
+        <button onClick={sendMessage} disabled={!input.trim() || sending}
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md transition-all active:scale-90"
+          style={{ background: input.trim() ? pinkG : "hsl(335 20% 88%)" }}>
+          <Icon name="Send" size={16} className="text-white" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Клиенты ──
 function AdminClients() {
   const [clients, setClients] = useState<any[]>([]);
