@@ -823,15 +823,7 @@ function HomePage({ setPage: navigateTo, startBooking, client, masters, siteSett
         </div>
       </div>
 
-      {/* Написать нам */}
-      <div className="px-4 mb-5">
-        <button onClick={() => navigateTo("chat")}
-          className="w-full py-4 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2.5 shadow-sm transition-all active:scale-95"
-          style={{ background: "white", color: "hsl(335 70% 45%)", border: "1.5px solid hsl(335 60% 82%)" }}>
-          <Icon name="MessageCircle" size={18} style={{ color: "hsl(335 75% 52%)" }} />
-          Написать нам — ответим быстро 💬
-        </button>
-      </div>
+
 
       {/* Видео — под разделами */}
       {siteSettings.video_show === "true" && siteSettings.video_url && (
@@ -1799,11 +1791,7 @@ function ProfileDashboard({ client, onLogout, setPage, scheduledSlots = {}, week
             style={{ background: "linear-gradient(135deg, hsl(335 80% 58%), hsl(315 70% 65%))" }}>
             🌸 Записаться
           </button>
-          <button onClick={() => setPage("chat")}
-            className="py-3.5 rounded-2xl font-semibold text-sm"
-            style={{ background: "white", color: "hsl(335 70% 45%)", border: "1.5px solid hsl(335 70% 80%)" }}>
-            💬 Написать нам
-          </button>
+
         </div>
 
         {/* Кнопки Share / Install / Отзыв / ВКонтакте / Звук */}
@@ -7709,7 +7697,7 @@ function BottomNav({ page, setPage }: { page: Page; setPage: (p: Page) => void }
   const items: { id: Page; icon: string; label: string }[] = [
     { id: "home", icon: "Home", label: "Главная" },
     { id: "shop", icon: "ShoppingBag", label: "Магазин" },
-    { id: "chat", icon: "MessageCircle", label: "Чат" },
+
     { id: "profile", icon: "User", label: "Профиль" },
   ];
 
