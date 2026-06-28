@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
 const CONTENT_URL = "https://functions.poehali.dev/440815df-d73f-44e1-957c-6a718db23941";
+const REVIEWS_URL = "https://functions.poehali.dev/c89e40ae-c0aa-45a1-8480-d692d54ff847";
 const YANDEX_REVIEWS_URL = "https://functions.poehali.dev/4ef8938c-3c1a-44c7-82d4-d62e6f0546fa";
 const pink = "hsl(335 80% 55%)";
 const textDark = "hsl(335 50% 25%)";
@@ -52,7 +53,7 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
   }, []);
 
   const loadReviews = () => {
-    fetch(`${CONTENT_URL}/reviews`)
+    fetch(REVIEWS_URL)
       .then(r => r.json())
       .then(d => setReviews(d.reviews?.length ? d.reviews : FALLBACK_REVIEWS))
       .catch(() => setReviews(FALLBACK_REVIEWS));
@@ -123,7 +124,7 @@ export default function ReviewsPage({ onBack }: { onBack?: () => void }) {
     try {
       const body: any = { client_name: name, rating, text, service };
       if (photo) { body.photo_data = photo.data; body.photo_name = photo.name; }
-      const res = await fetch(`${CONTENT_URL}/reviews`, {
+      const res = await fetch(REVIEWS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
